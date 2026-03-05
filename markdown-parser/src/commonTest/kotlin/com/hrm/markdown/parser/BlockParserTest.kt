@@ -1181,6 +1181,49 @@ class DefinitionListTest {
         // 没有空格不应该解析为定义列表
         assertTrue(first !is DefinitionList)
     }
+
+    @Test
+    fun should_parse_definition_with_multiple_paragraphs() {
+        val input = "Term\n: First paragraph.\n\n  Second paragraph."
+        val doc = parser.parse(input)
+        val defList = doc.children.first()
+        assertIs<DefinitionList>(defList)
+        val desc = defList.children.filterIsInstance<DefinitionDescription>().first()
+        // 定义描述内应包含两个段落
+        val paragraphs = desc.children.filterIsInstance<Paragraph>()
+        assertEquals(2, paragraphs.size)
+    }
+
+    @Test
+    fun should_parse_definition_with_code_block() {
+        val input = "Term\n: Definition with code:\n\n  ```kotlin\n  fun hello() = println(\"Hi\")\n  ```"
+        val doc = parser.parse(input)
+        val defList = doc.children.first()
+        assertIs<DefinitionList>(defList)
+        val desc = defList.children.filterIsInstance<DefinitionDescription>().first()
+        // 定义描述内应包含段落和代码块
+        assertTrue(desc.children.any { it is Paragraph })
+        assertTrue(desc.children.any { it is FencedCodeBlock })
+    }
+
+    @Test
+    fun should_parse_definition_with_nested_list() {
+        val input = "Term\n: Definition:\n\n  - Item 1\n  - Item 2"
+        val doc = parser.parse(input)
+        val defList = doc.children.first()
+        assertIs<DefinitionList>(defList)
+        val desc = defList.children.filterIsInstance<DefinitionDescription>().first()
+        assertTrue(desc.children.any { it is ListBlock })
+    }
+
+    @Test
+    fun should_end_definition_on_unindented_content_after_blank_line() {
+        val input = "Term\n: Definition.\n\nNew paragraph outside."
+        val doc = parser.parse(input)
+        // 定义列表后应跟一个独立段落
+        assertTrue(doc.children.any { it is DefinitionList })
+        assertTrue(doc.children.any { it is Paragraph })
+    }
 }
 
 // ────── Admonition 测试 ──────

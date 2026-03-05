@@ -767,9 +767,9 @@ private class InlineParserInstance(
                 removeLL(closer.llNode)
                 removeDelim(closer)
                 closer = nextCloser
-            } else {
-                closer = closer.next
             }
+            // 如果 closer 还有剩余计数，保持不变继续下一轮匹配
+            // （例如 ***text*** 消耗2个后剩余1个，需要继续匹配斜体）
         }
 
         // 移除 stackBottom 上方的剩余分隔符

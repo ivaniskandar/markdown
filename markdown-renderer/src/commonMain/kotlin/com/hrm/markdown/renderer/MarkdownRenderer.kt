@@ -47,8 +47,39 @@ fun Markdown(
 
 /**
  * 接收已解析的 [Document] 节点进行渲染。
- * 适用于增量解析场景：外部管理 parser 实例并传入更新后的 AST。
+ * 适用于流式/增量解析场景：外部管理 MarkdownParser 实例并传入更新后的 AST。
+ *
+ * 典型用法：
+ * ```
+ * val parser = remember { MarkdownParser() }
+ * var doc by remember { mutableStateOf(parser.parse("")) }
+ * LaunchedEffect(Unit) {
+ *     parser.beginStream()
+ *     tokens.collect { chunk ->
+ *         doc = parser.append(chunk)
+ *     }
+ *     doc = parser.endStream()
+ * }
+ * Markdown(document = doc, ...)
+ * ```
  */
+@Composable
+fun Markdown(
+    document: Document,
+    modifier: Modifier = Modifier,
+    theme: MarkdownTheme = MarkdownTheme(),
+    scrollState: ScrollState = rememberScrollState(),
+    onLinkClick: ((String) -> Unit)? = null,
+) {
+    InnerMarkdown(
+        document = document,
+        modifier = modifier,
+        theme = theme,
+        scrollState = scrollState,
+        onLinkClick = onLinkClick,
+    )
+}
+
 @Composable
 internal fun InnerMarkdown(
     document: Document,

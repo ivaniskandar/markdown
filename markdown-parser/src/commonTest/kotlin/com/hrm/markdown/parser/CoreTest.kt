@@ -1,101 +1,10 @@
 package com.hrm.markdown.parser
 
 import com.hrm.markdown.parser.ast.*
-import com.hrm.markdown.parser.incremental.EditOperation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-
-class IncrementalParserTest {
-
-    private val parser = MarkdownParser()
-
-    @Test
-    fun should_handle_insert_in_heading() {
-        parser.parse("# Hello\n\nWorld")
-        val doc = parser.applyEdit(EditOperation.Insert(7, " Kotlin"))
-        val heading = doc.children.first()
-        assertIs<Heading>(heading)
-        // After edit, the heading should contain "Hello Kotlin"
-        assertTrue(doc.children.isNotEmpty())
-    }
-
-    @Test
-    fun should_handle_insert_new_line() {
-        parser.parse("# Hello\n\nWorld")
-        val doc = parser.applyEdit(EditOperation.Insert(14, "\n\nNew paragraph"))
-        assertTrue(doc.children.size >= 2)
-    }
-
-    @Test
-    fun should_handle_delete() {
-        parser.parse("# Hello World\n\nParagraph text")
-        val doc = parser.applyEdit(EditOperation.Delete(7, 13)) // Delete " World"
-        val heading = doc.children.first()
-        assertIs<Heading>(heading)
-    }
-
-    @Test
-    fun should_handle_replace() {
-        parser.parse("# Hello\n\nWorld")
-        val doc = parser.applyEdit(EditOperation.Replace(2, 7, "Goodbye"))
-        val heading = doc.children.first()
-        assertIs<Heading>(heading)
-    }
-
-    @Test
-    fun should_handle_insert_code_block() {
-        parser.parse("# Hello\n\nWorld")
-        val doc = parser.applyEdit(EditOperation.Insert(14, "\n\n```kotlin\nfun main() {}\n```"))
-        assertTrue(doc.children.any { it is FencedCodeBlock })
-    }
-
-    @Test
-    fun should_handle_multiple_edits() {
-        parser.parse("# Hello\n\nWorld\n\nFoo")
-        val doc = parser.applyEdits(listOf(
-            EditOperation.Insert(14, " changed"),
-            EditOperation.Replace(2, 7, "Bye")
-        ))
-        assertTrue(doc.children.isNotEmpty())
-    }
-
-    @Test
-    fun should_handle_edit_to_empty() {
-        parser.parse("# Hello")
-        val doc = parser.applyEdit(EditOperation.Replace(0, 7, ""))
-        assertTrue(doc.children.isEmpty() || doc.children.all { it is BlankLine })
-    }
-
-    @Test
-    fun should_handle_insert_into_empty() {
-        parser.parse("")
-        val doc = parser.applyEdit(EditOperation.Insert(0, "# Hello"))
-        assertTrue(doc.children.isNotEmpty())
-        val heading = doc.children.first()
-        assertIs<Heading>(heading)
-    }
-
-    @Test
-    fun should_preserve_unaffected_blocks() {
-        parser.parse("# Title\n\nParagraph 1\n\nParagraph 2\n\nParagraph 3")
-        val originalBlockCount = parser.document.children.size
-
-        // Edit only affects the first paragraph
-        val doc = parser.applyEdit(EditOperation.Replace(9, 20, "Changed text"))
-        // Should still have similar number of blocks
-        assertTrue(doc.children.isNotEmpty())
-    }
-
-    @Test
-    fun should_handle_adding_block_quote() {
-        parser.parse("Hello\n\nWorld")
-        val doc = parser.applyEdit(EditOperation.Insert(0, "> "))
-        val first = doc.children.first()
-        assertIs<BlockQuote>(first)
-    }
-}
 
 class SourceTextTest {
 

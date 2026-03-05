@@ -60,8 +60,23 @@ class InlineParserTest {
         val doc = parser.parse("***bold italic***")
         val para = doc.children.first()
         assertIs<Paragraph>(para)
-        // Should contain nested emphasis + strong
-        assertTrue(para.children.isNotEmpty())
+        // ***text*** 应该解析为嵌套的 StrongEmphasis + Emphasis（或反过来）
+        // 外层应该是 Emphasis 或 StrongEmphasis
+        val outer = para.children.first()
+        assertTrue(
+            outer is Emphasis || outer is StrongEmphasis,
+            "Expected Emphasis or StrongEmphasis, got ${outer::class.simpleName}"
+        )
+        // 内层也应该是 Emphasis 或 StrongEmphasis
+        val inner = (outer as ContainerNode).children.first()
+        assertTrue(
+            inner is Emphasis || inner is StrongEmphasis,
+            "Expected nested Emphasis or StrongEmphasis, got ${inner::class.simpleName}"
+        )
+        // 最里层应该是文本 "bold italic"
+        val text = (inner as ContainerNode).children.first()
+        assertIs<Text>(text)
+        assertEquals("bold italic", text.literal)
     }
 
     @Test

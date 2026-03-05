@@ -368,16 +368,54 @@ class BlockParser(
                     }
                 }
             }
-            is DefinitionList -> true // 定义列表始终继续
-            is DefinitionDescription -> {
-                // 如果行有缩进则继续（类似列表项）
+            is DefinitionList -> {
                 if (cursor.restIsBlank()) {
+                    ob.blankLineCount++
+                    true
+                } else {
+                    // 检查当前行是否是定义描述的延续（缩进内容）或新的定义描述开头
+                    val snap = cursor.snapshot()
+                    val indent = cursor.advanceSpaces(3)
+                    val isDefDescStart = !cursor.isAtEnd && cursor.peek() == ':' && run {
+                        val snap2 = cursor.snapshot()
+                        cursor.advance()
+                        val hasSpace = !cursor.isAtEnd && (cursor.peek() == ' ' || cursor.peek() == '\t')
+                        cursor.restore(snap2)
+                        hasSpace
+                    }
+                    cursor.restore(snap)
+                    if (isDefDescStart) {
+                        true
+                    } else if (ob.blankLineCount > 0) {
+                        // 空行之后的非定义描述行 → 检查是否有缩进（属于子 DefinitionDescription 内容）
+                        val snap2 = cursor.snapshot()
+                        val indentCheck = cursor.advanceSpaces()
+                        cursor.restore(snap2)
+                        if (indentCheck >= 2) {
+                            true // 缩进内容可能属于 DefinitionDescription 内的块级元素
+                        } else {
+                            false // 无缩进的非定义描述行 → 结束定义列表
+                        }
+                    } else {
+                        true // 无空行时，非定义描述行可能是新术语（段落 → DefinitionTerm 转换）
+                    }
+                }
+            }
+            is DefinitionDescription -> {
+                // 类似 ListItem：空行时递增空行计数并继续
+                if (cursor.restIsBlank()) {
+                    ob.blankLineCount++
                     true
                 } else {
                     val snap = cursor.snapshot()
                     val indent = cursor.advanceSpaces()
                     if (indent >= 2) {
+                        // 有缩进的内容继续属于该定义描述
                         true
+                    } else if (ob.blankLineCount > 0) {
+                        // 空行之后无缩进的内容 → 结束定义描述
+                        cursor.restore(snap)
+                        false
                     } else {
                         cursor.restore(snap)
                         false
@@ -590,6 +628,9 @@ class BlockParser(
         // 信息字符串（反引号围栏的信息中不允许包含反引号）
         val info = cursor.rest().trim()
         if (c == '`' && info.contains('`')) return null
+
+        // 消耗掉 info string 剩余部分，避免被 addLineToTip 当作代码内容
+        cursor.advance(cursor.remaining)
 
         val language = info.split(INFO_LANG_SPLIT_REGEX).firstOrNull()?.trim() ?: ""
 
@@ -1160,14 +1201,11 @@ class BlockParser(
                 // 标记空行用于松散列表检测
             }
             is DefinitionDescription -> {
-                // 空行结束定义描述
-                finalizeBlock(tip)
-                openBlocks.removeAt(openBlocks.size - 1)
+                // 空行不立即结束定义描述，由 continueBlock 通过空行计数和缩进判断
+                tip.blankLineCount++
             }
             is DefinitionList -> {
-                // 空行结束定义列表
-                finalizeBlock(tip)
-                openBlocks.removeAt(openBlocks.size - 1)
+                // 空行不立即结束定义列表，由子节点的终止来决定
             }
             else -> {
                 // 其他块：空行
