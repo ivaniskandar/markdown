@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.hrm.markdown.parser.ast.Paragraph
 import com.hrm.markdown.renderer.LocalMarkdownTheme
-import com.hrm.markdown.renderer.LocalRendererContext
+import com.hrm.markdown.renderer.LocalOnLinkClick
 import com.hrm.markdown.renderer.inline.rememberInlineContent
 
 /**
@@ -19,8 +19,8 @@ internal fun ParagraphRenderer(
     modifier: Modifier = Modifier,
 ) {
     val theme = LocalMarkdownTheme.current
-    val context = LocalRendererContext.current
-    val (annotated, inlineContents) = rememberInlineContent(node, context.onLinkClick)
+    val onLinkClick = LocalOnLinkClick.current
+    val (annotated, inlineContents) = rememberInlineContent(node, onLinkClick)
 
     BasicText(
         text = annotated,

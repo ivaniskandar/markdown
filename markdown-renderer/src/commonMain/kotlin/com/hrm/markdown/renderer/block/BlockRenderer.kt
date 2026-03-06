@@ -11,7 +11,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.hrm.markdown.parser.ast.*
 import com.hrm.markdown.renderer.LocalMarkdownTheme
-import com.hrm.markdown.renderer.LocalRendererContext
+import com.hrm.markdown.renderer.LocalRendererDocument
 
 /**
  * 块级节点分发器。
@@ -63,8 +63,7 @@ internal fun TocPlaceholderRenderer(
     modifier: Modifier = Modifier,
 ) {
     val theme = LocalMarkdownTheme.current
-    val context = LocalRendererContext.current
-    val document = context.document
+    val document = LocalRendererDocument.current
 
     // 收集所有标题
     val headings = collectHeadings(document)

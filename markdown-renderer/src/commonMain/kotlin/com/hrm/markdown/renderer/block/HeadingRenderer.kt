@@ -11,7 +11,8 @@ import androidx.compose.ui.unit.dp
 import com.hrm.markdown.parser.ast.Heading
 import com.hrm.markdown.parser.ast.SetextHeading
 import com.hrm.markdown.renderer.LocalMarkdownTheme
-import com.hrm.markdown.renderer.LocalRendererContext
+import com.hrm.markdown.renderer.LocalOnLinkClick
+import com.hrm.markdown.renderer.LocalOnLinkClick
 import com.hrm.markdown.renderer.inline.rememberInlineContent
 
 /**
@@ -23,10 +24,10 @@ internal fun HeadingRenderer(
     modifier: Modifier = Modifier,
 ) {
     val theme = LocalMarkdownTheme.current
-    val context = LocalRendererContext.current
+    val onLinkClick = LocalOnLinkClick.current
     val level = (node.level - 1).coerceIn(0, theme.headingStyles.lastIndex)
     val style = theme.headingStyles[level]
-    val (annotated, inlineContents) = rememberInlineContent(node, context.onLinkClick)
+    val (annotated, inlineContents) = rememberInlineContent(node, onLinkClick)
 
     Column(modifier = modifier.fillMaxWidth()) {
         BasicText(
@@ -55,10 +56,10 @@ internal fun SetextHeadingRenderer(
     modifier: Modifier = Modifier,
 ) {
     val theme = LocalMarkdownTheme.current
-    val context = LocalRendererContext.current
+    val onLinkClick = LocalOnLinkClick.current
     val level = (node.level - 1).coerceIn(0, theme.headingStyles.lastIndex)
     val style = theme.headingStyles[level]
-    val (annotated, inlineContents) = rememberInlineContent(node, context.onLinkClick)
+    val (annotated, inlineContents) = rememberInlineContent(node, onLinkClick)
 
     Column(modifier = modifier.fillMaxWidth()) {
         BasicText(

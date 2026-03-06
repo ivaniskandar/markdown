@@ -39,7 +39,7 @@ import com.hrm.markdown.parser.ast.Document
 import com.hrm.markdown.renderer.Markdown
 import com.hrm.markdown.renderer.MarkdownTheme
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
+
 import kotlinx.coroutines.launch
 
 @Composable
@@ -114,6 +114,7 @@ private fun StreamingMarkdownDemo() {
                             for (token in streamingTokens) {
                                 // 每次 append 后立即更新 document 状态，触发 UI 重组
                                 document = parser.append(token)
+                                // 慢速模式使用固定 200ms 延迟，便于逐帧观察
                                 delay(token.streamDelay())
                             }
                             document = parser.endStream()
@@ -155,6 +156,7 @@ private fun StreamingMarkdownDemo() {
                     fontWeight = FontWeight.Medium
                 )
             }
+
         }
 
         if (document == null && !isRunning) {
@@ -184,26 +186,67 @@ private fun StreamingMarkdownDemo() {
                     .padding(horizontal = 16.dp),
                 theme = MarkdownTheme(),
                 scrollState = scrollState,
+                isStreaming = isRunning,
                 onLinkClick = { url ->
                     println("Clicked link: $url")
                 }
             )
 
-            // 流式生成时自动跟随滚动到底部
-            // 监听 maxValue 变化（布局完成后才会更新），而非 doc 对象变化
-            // 仅当用户没有手动上滑时（当前位置接近底部）才自动跟随
+            // 流式滚动策略：
+            // 流式生成期间：自动滚动跟随内容增长，直接滚动到底部。
+            // 用户上滑 → 退出自动跟随；用户滚回底部 → 恢复自动跟随。
+            // 流式结束后：确保最终滚动到底部。
+            var autoFollow by remember { mutableStateOf(true) }
+
             LaunchedEffect(isRunning) {
                 if (!isRunning) return@LaunchedEffect
-                snapshotFlow { scrollState.maxValue }
-                    .distinctUntilChanged()
-                    .collect { maxValue ->
-                        if (maxValue > 0) {
-                            val isNearBottom = scrollState.value >= maxValue - 200
-                            if (isNearBottom) {
-                                scrollState.scrollTo(maxValue)
+                autoFollow = true
+
+                // 检测用户主动上滑 → 退出自动跟随
+                launch {
+                    snapshotFlow { scrollState.isScrollInProgress to scrollState.value }
+                        .collect { (isScrolling, value) ->
+                            if (isScrolling && value < scrollState.maxValue - 100) {
+                                autoFollow = false
                             }
                         }
+                }
+
+                // 检测用户滚动回底部附近 → 重新进入自动跟随
+                launch {
+                    snapshotFlow { scrollState.value to scrollState.maxValue }
+                        .collect { (value, maxValue) ->
+                            if (!autoFollow && maxValue > 0 && value >= maxValue - 100) {
+                                autoFollow = true
+                            }
+                        }
+                }
+
+                // 匀速滚动循环：每帧检查目标位置，平滑追赶到底部
+                while (true) {
+                    delay(16L) // ~60fps
+                    if (!autoFollow) continue
+
+                    val maxValue = scrollState.maxValue
+                    val currentValue = scrollState.value
+                    val remaining = maxValue - currentValue
+
+                    if (remaining > 0) {
+                        if (remaining <= 10) {
+                            scrollState.scrollTo(maxValue)
+                        } else {
+                            val step = (remaining * 0.35f).toInt().coerceAtLeast(1)
+                            scrollState.scrollTo(currentValue + step)
+                        }
                     }
+                }
+            }
+
+            // 流式结束后，确保滚动到底部
+            LaunchedEffect(streamFinished) {
+                if (!streamFinished) return@LaunchedEffect
+                delay(50L)
+                scrollState.animateScrollTo(scrollState.maxValue)
             }
         }
     }

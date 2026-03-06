@@ -90,13 +90,13 @@ class NewFeatureTest {
 ### 4.1 执行命令
 ```bash
 # Parser 模块测试
-./gradlew :markdown-parser:allTests
+./gradlew :markdown-parser:jvmTest
 
 # Renderer 模块测试
-./gradlew :markdown-renderer:allTests
+./gradlew :markdown-renderer:jvmTest
 
 # 全部测试
-./gradlew allTests
+./gradlew jvmTest
 ```
 
 ### 4.2 通过标准
@@ -148,6 +148,6 @@ val newFeatureSample = """
 - [ ] `markdown-parser` 中添加了对应的单元测试 (`commonTest`)。
 - [ ] `markdown-renderer` 中实现了渲染逻辑（如涉及渲染）。
 - [ ] `markdown-renderer` 中添加了对应的单元测试（如涉及渲染）。
-- [ ] 运行 `./gradlew allTests` 并全部通过。
+- [ ] 运行 `./gradlew jvmTest` 并全部通过。
 - [ ] `composeApp` 中添加了该功能的预览示例。
 - [ ] 更新 `markdown-parser/PARSER_COVERAGE_ANALYSIS.md` 支持列表。

@@ -22,7 +22,7 @@ import com.hrm.markdown.parser.ast.TableCell
 import com.hrm.markdown.parser.ast.TableHead
 import com.hrm.markdown.parser.ast.TableRow
 import com.hrm.markdown.renderer.LocalMarkdownTheme
-import com.hrm.markdown.renderer.LocalRendererContext
+import com.hrm.markdown.renderer.LocalOnLinkClick
 import com.hrm.markdown.renderer.inline.rememberInlineContent
 
 /**
@@ -154,7 +154,7 @@ private fun TableCellRenderer(
     modifier: Modifier = Modifier,
 ) {
     val theme = LocalMarkdownTheme.current
-    val context = LocalRendererContext.current
+    val onLinkClick = LocalOnLinkClick.current
 
     val textAlign = when (alignment) {
         Table.Alignment.LEFT -> TextAlign.Start
@@ -174,7 +174,7 @@ private fun TableCellRenderer(
         return
     }
 
-    val (annotated, inlineContents) = rememberInlineContent(cell, context.onLinkClick)
+    val (annotated, inlineContents) = rememberInlineContent(cell, onLinkClick)
 
     Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         if (inlineContents.isEmpty()) {

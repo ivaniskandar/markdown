@@ -656,6 +656,108 @@ class StreamingParserTest {
 
         parser.endStream()
     }
+
+    // ────── 节点实例复用测试 ──────
+
+    @Test
+    fun should_reuse_fenced_code_block_instance_across_appends() {
+        val parser = MarkdownParser()
+        parser.beginStream()
+
+        parser.append("```kotlin\n")
+        parser.append("fun main() {\n")
+
+        // 获取第一次的 FencedCodeBlock 实例引用
+        val doc1 = parser.document
+        val codeBlock1 = doc1.children.find { it is FencedCodeBlock }
+        assertIs<FencedCodeBlock>(codeBlock1)
+
+        // 继续追加 token（代码块仍未闭合）
+        parser.append("    println(\"Hello\")\n")
+
+        val doc2 = parser.document
+        val codeBlock2 = doc2.children.find { it is FencedCodeBlock }
+        assertIs<FencedCodeBlock>(codeBlock2)
+
+        // 关键断言：同一个未闭合代码块在连续 append 中应复用实例引用
+        assertTrue(
+            codeBlock1 === codeBlock2,
+            "FencedCodeBlock instance should be reused across appends (=== identity)"
+        )
+
+        // 内容应该已更新
+        assertTrue(
+            codeBlock2.literal.contains("println"),
+            "Reused instance should have updated literal"
+        )
+
+        parser.endStream()
+    }
+
+    @Test
+    fun should_reuse_fenced_code_block_instance_with_multiple_tokens() {
+        val parser = MarkdownParser()
+        parser.beginStream()
+
+        parser.append("```\n")
+        parser.append("line1\n")
+
+        val doc1 = parser.document
+        val ref1 = doc1.children.find { it is FencedCodeBlock }
+        assertIs<FencedCodeBlock>(ref1)
+
+        parser.append("line2\n")
+        val ref2 = parser.document.children.find { it is FencedCodeBlock }
+        assertIs<FencedCodeBlock>(ref2)
+
+        parser.append("line3\n")
+        val ref3 = parser.document.children.find { it is FencedCodeBlock }
+        assertIs<FencedCodeBlock>(ref3)
+
+        parser.append("line4\n")
+        val ref4 = parser.document.children.find { it is FencedCodeBlock }
+        assertIs<FencedCodeBlock>(ref4)
+
+        // 所有引用应该是同一个实例
+        assertTrue(ref1 === ref2, "ref1 === ref2")
+        assertTrue(ref2 === ref3, "ref2 === ref3")
+        assertTrue(ref3 === ref4, "ref3 === ref4")
+
+        // 最终内容应包含所有行
+        assertTrue(ref4.literal.contains("line1"), "Should contain line1")
+        assertTrue(ref4.literal.contains("line4"), "Should contain line4")
+
+        parser.endStream()
+    }
+
+    @Test
+    fun should_not_reuse_instance_after_code_block_closed() {
+        val parser = MarkdownParser()
+        parser.beginStream()
+
+        parser.append("```\n")
+        parser.append("code content\n")
+
+        val doc1 = parser.document
+        val openBlock = doc1.children.find { it is FencedCodeBlock }
+        assertIs<FencedCodeBlock>(openBlock)
+
+        // 关闭代码块 + 空行（使其变为 stable）
+        parser.append("```\n\n")
+
+        val doc2 = parser.document
+        val closedBlock = doc2.children.find { it is FencedCodeBlock }
+        assertIs<FencedCodeBlock>(closedBlock)
+
+        // 关闭后的代码块内容应该正确
+        assertTrue(
+            closedBlock.literal.contains("code content"),
+            "Closed block should contain the code content"
+        )
+
+        parser.endStream()
+    }
+
 }
 
 class InlineAutoCloserTest {

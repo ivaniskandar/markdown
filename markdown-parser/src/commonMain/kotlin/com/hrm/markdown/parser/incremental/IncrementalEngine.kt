@@ -287,7 +287,10 @@ class IncrementalEngine(
             newDoc.appendChild(block)
         }
 
-        for (block in displayBlocks) {
+        // 对 displayBlocks（仍在构建中的块）尝试复用旧文档中的同类型节点实例，
+        // 使 Compose 层面的 === 引用比较可以跳过未变化部分的重组。
+        val reusedDisplayBlocks = reuseOpenBlockInstances(displayBlocks, oldChildren)
+        for (block in reusedDisplayBlocks) {
             newDoc.appendChild(block)
         }
 
@@ -312,6 +315,45 @@ class IncrementalEngine(
 
         _document = newDoc
         return _document
+    }
+
+    // ────── 开放块实例复用 ──────
+
+    /**
+     * 对仍在构建中的 displayBlocks，尝试在旧文档的 children 中查找
+     * 同 startLine + 同类型的旧节点实例。若找到，将新解析的属性写入旧实例并返回旧实例，
+     * 使 Compose 的 === 引用比较判断为同一对象，跳过不必要的重组。
+     *
+     * 仅对 FencedCodeBlock 做复用（只有代码块在流式场景中会因反复重解析导致抖动）。
+     * 其他类型直接返回新实例。
+     */
+    private fun reuseOpenBlockInstances(
+        displayBlocks: List<Node>,
+        oldChildren: List<Node>,
+    ): List<Node> {
+        if (displayBlocks.isEmpty() || oldChildren.isEmpty()) return displayBlocks
+
+        return displayBlocks.map { newBlock ->
+            if (newBlock !is FencedCodeBlock) return@map newBlock
+
+            val oldBlock = oldChildren.find { old ->
+                old is FencedCodeBlock &&
+                        old.lineRange.startLine == newBlock.lineRange.startLine
+            } as? FencedCodeBlock ?: return@map newBlock
+
+            // 将新解析的属性写入旧实例，保持对象引用不变
+            oldBlock.literal = newBlock.literal
+            oldBlock.lineRange = newBlock.lineRange
+            oldBlock.sourceRange = newBlock.sourceRange
+            oldBlock.contentHash = newBlock.contentHash
+            oldBlock.info = newBlock.info
+            oldBlock.language = newBlock.language
+            oldBlock.fenceChar = newBlock.fenceChar
+            oldBlock.fenceLength = newBlock.fenceLength
+            oldBlock.fenceIndent = newBlock.fenceIndent
+            oldBlock.parent = null
+            oldBlock
+        }
     }
 
     // ────── 块稳定性分类 ──────

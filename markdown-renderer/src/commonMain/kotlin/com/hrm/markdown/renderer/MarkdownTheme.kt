@@ -4,7 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -157,7 +157,7 @@ internal fun defaultAdmonitionStyles(): Map<String, AdmonitionStyle> = mapOf(
     ),
 )
 
-internal val LocalMarkdownTheme = staticCompositionLocalOf { MarkdownTheme() }
+internal val LocalMarkdownTheme = compositionLocalOf { MarkdownTheme() }
 
 /**
  * 提供 Markdown 主题到组件树。
