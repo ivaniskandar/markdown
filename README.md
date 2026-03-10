@@ -42,7 +42,7 @@
 Real-time token-by-token output with incremental parsing — no flicker, no re-render.
 
 <p align="center">
-  <img src="./images/llm_stream.png" width="700" alt="LLM Streaming Rendering Demo" />
+  <img src="./images/llm_stream.png" width="360" alt="LLM Streaming Rendering Demo" />
 </p>
 
 ### 🔍 Syntax Diagnostics & Linting
@@ -50,7 +50,7 @@ Real-time token-by-token output with incremental parsing — no flicker, no re-r
 Built-in linting with WCAG accessibility checks — heading jumps, broken footnotes, empty links, and more.
 
 <p align="center">
-  <img src="./images/Diagnostic.png" width="700" alt="Markdown Diagnostics & Linting" />
+  <img src="./images/Diagnostic.png" width="360" alt="Markdown Diagnostics & Linting" />
 </p>
 
 ### 🌐 Rich HTML & Extension Support
@@ -58,7 +58,7 @@ Built-in linting with WCAG accessibility checks — heading jumps, broken footno
 Full HTML block/inline support, GFM tables, admonitions, math, code highlighting, and 20+ extensions.
 
 <p align="center">
-  <img src="./images/html_support.png" width="700" alt="HTML & Extension Support" />
+  <img src="./images/html_support.png" width="360" alt="HTML & Extension Support" />
 </p>
 
 ---

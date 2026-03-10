@@ -42,7 +42,7 @@
 实时逐 token 输出，增量解析 — 无闪烁、无重绘。
 
 <p align="center">
-  <img src="./images/llm_stream.png" width="700" alt="LLM 流式渲染效果" />
+  <img src="./images/llm_stream.png" width="360" alt="LLM 流式渲染效果" />
 </p>
 
 ### 🔍 语法诊断与 Linting
@@ -50,7 +50,7 @@
 内置语法检查，支持 WCAG 无障碍审查 — 标题跳级、脚注断链、空链接等问题一目了然。
 
 <p align="center">
-  <img src="./images/Diagnostic.png" width="700" alt="Markdown 语法诊断" />
+  <img src="./images/Diagnostic.png" width="360" alt="Markdown 语法诊断" />
 </p>
 
 ### 🌐 丰富的 HTML 与扩展语法支持
@@ -58,7 +58,7 @@
 完整的 HTML 块级/行内支持，GFM 表格、告示块、数学公式、代码高亮等 20+ 扩展语法。
 
 <p align="center">
-  <img src="./images/html_support.png" width="700" alt="HTML 与扩展语法支持" />
+  <img src="./images/html_support.png" width="360" alt="HTML 与扩展语法支持" />
 </p>
 
 ---
