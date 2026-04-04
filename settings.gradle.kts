@@ -25,6 +25,18 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        maven {
+            url = uri("https://maven.pkg.github.com/ivaniskandar/latex")
+            credentials {
+                username = providers.gradleProperty("githubUser").getOrNull()
+                    ?: providers.environmentVariable("GITHUB_USER").getOrNull()
+                password = providers.gradleProperty("githubApiKey").getOrNull()
+                    ?: providers.environmentVariable("GITHUB_API_KEY").getOrNull()
+            }
+            mavenContent {
+                includeModuleByRegex("xyz.ivaniskandar", "latex-.*")
+            }
+        }
     }
 }
 
