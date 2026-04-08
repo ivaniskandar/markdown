@@ -293,9 +293,14 @@ class IncrementalEngine(
         }
         lastParsedLength = text.length
 
+        val oldChildren = _document.children
         // 使用脏区域追踪器计算安全重解析起点
-        val dirtyRange = dirtyTracker.computeAppendDirtyRange(stableEndLine, newSource)
-        val reparseStart = dirtyRange.startLine
+        val lastStableBlock = if (stableBlockCount > 0) oldChildren.getOrNull(stableBlockCount - 1) else null
+        val reparseStart = if (lastStableBlock != null && isSelfDelimitedBlock(lastStableBlock)) {
+            stableEndLine.coerceAtMost(newSource.lineCount)
+        } else {
+            dirtyTracker.computeAppendDirtyRange(stableEndLine, newSource).startLine
+        }
         HLog.v(TAG) { "doIncrementalAppend: reparseStart=$reparseStart, lines=${newSource.lineCount}, stableEndLine=$stableEndLine" }
 
         // 解析脏区域（BlockParser 只做块结构 + 行内解析，后处理由 Engine 统一控制）
@@ -332,7 +337,6 @@ class IncrementalEngine(
         newDoc.abbreviationDefinitions.putAll(_document.abbreviationDefinitions)
 
         // 复用 reparseStart 之前的旧块
-        val oldChildren = _document.children
         val reusableCount = oldChildren.count { child ->
             child.lineRange.endLine <= reparseStart
         }
@@ -342,21 +346,19 @@ class IncrementalEngine(
             newDoc.appendChild(child)
         }
 
-        for (block in nowStable) {
+        val reusedStableBlocks = reuseFencedCodeBlockInstances(nowStable, oldChildren)
+        for (block in reusedStableBlocks) {
             newDoc.appendChild(block)
         }
 
-        // 对 displayBlocks（仍在构建中的块）尝试复用旧文档中的同类型节点实例，
-        // 使 Compose 层面的 === 引用比较可以跳过未变化部分的重组。
-        val reusedDisplayBlocks = reuseOpenBlockInstances(displayBlocks, oldChildren)
-        for (block in reusedDisplayBlocks) {
+        for (block in displayBlocks) {
             newDoc.appendChild(block)
         }
 
-        val newStableCount = reusableCount + nowStable.size
+        val newStableCount = reusableCount + reusedStableBlocks.size
         stableBlockCount = newStableCount
-        stableEndLine = if (nowStable.isNotEmpty()) {
-            nowStable.last().lineRange.endLine
+        stableEndLine = if (reusedStableBlocks.isNotEmpty()) {
+            reusedStableBlocks.last().lineRange.endLine
         } else if (reusableCount > 0) {
             oldChildren[reusableCount - 1].lineRange.endLine
         } else {
@@ -373,7 +375,7 @@ class IncrementalEngine(
         postProcessors.processAll(newDoc)
 
         _document = newDoc
-        HLog.v(TAG) { "doIncrementalAppend done: reused=$reusableCount, stable=${nowStable.size}, open=${reusedDisplayBlocks.size}, total=${newDoc.children.size}" }
+        HLog.v(TAG) { "doIncrementalAppend done: reused=$reusableCount, stable=${reusedStableBlocks.size}, open=${displayBlocks.size}, total=${newDoc.children.size}" }
         return _document
     }
 
@@ -385,7 +387,7 @@ class IncrementalEngine(
      * 仅对 FencedCodeBlock 做复用（只有代码块在流式场景中会因反复重解析导致抖动）。
      * 其他类型直接返回新实例。
      */
-    private fun reuseOpenBlockInstances(
+    private fun reuseFencedCodeBlockInstances(
         displayBlocks: List<Node>,
         oldChildren: List<Node>,
     ): List<Node> {
@@ -409,6 +411,10 @@ class IncrementalEngine(
             oldBlock.fenceChar = newBlock.fenceChar
             oldBlock.fenceLength = newBlock.fenceLength
             oldBlock.fenceIndent = newBlock.fenceIndent
+            oldBlock.attributes = newBlock.attributes
+            oldBlock.highlightLines = newBlock.highlightLines
+            oldBlock.showLineNumbers = newBlock.showLineNumbers
+            oldBlock.startLineNumber = newBlock.startLineNumber
             oldBlock.parent = null
             oldBlock
         }
@@ -440,7 +446,7 @@ class IncrementalEngine(
                 val gapStart = block.lineRange.endLine
                 val gapEnd = nextBlock.lineRange.startLine
                 val hasBlankSeparator = (gapStart < gapEnd) && hasBlankLineInRange(source, gapStart, gapEnd)
-                if (hasBlankSeparator) {
+                if (hasBlankSeparator || isSelfDelimitedBoundary(block, nextBlock)) {
                     stable.add(block)
                 } else {
                     for (j in i until blocks.size) {
@@ -451,6 +457,24 @@ class IncrementalEngine(
             }
         }
         return Pair(stable, open)
+    }
+
+    private fun isSelfDelimitedBoundary(block: Node, nextBlock: Node): Boolean {
+        if (block.lineRange.endLine > nextBlock.lineRange.startLine) return false
+        return isSelfDelimitedBlock(block)
+    }
+
+    private fun isSelfDelimitedBlock(block: Node): Boolean {
+        return when (block) {
+            is FencedCodeBlock,
+            is IndentedCodeBlock,
+            is HtmlBlock,
+            is MathBlock,
+            is DiagramBlock,
+            is FrontMatter,
+            is ThematicBreak -> true
+            else -> false
+        }
     }
 
     private fun isBlockFullyClosed(block: Node, source: SourceText): Boolean {

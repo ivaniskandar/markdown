@@ -33,6 +33,7 @@ internal val LocalRendererDocument = compositionLocalOf { Document() }
 internal val LocalMarkdownConfig = compositionLocalOf { MarkdownConfig.Default }
 
 internal val LocalCodeHighlightTheme = compositionLocalOf<CodeTheme?> { null }
+internal val LocalIsStreaming = compositionLocalOf { false }
 
 @Composable
 internal fun ProvideRendererContext(
@@ -41,6 +42,7 @@ internal fun ProvideRendererContext(
     imageContent: MarkdownImageRenderer? = null,
     config: MarkdownConfig = MarkdownConfig.Default,
     codeTheme: CodeTheme? = null,
+    isStreaming: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     // 用 rememberUpdatedState 包装 onLinkClick：
@@ -62,6 +64,7 @@ internal fun ProvideRendererContext(
         LocalImageRenderer provides imageContent,
         LocalMarkdownConfig provides config,
         LocalCodeHighlightTheme provides codeTheme,
+        LocalIsStreaming provides isStreaming,
     ) {
         content()
     }

@@ -6,12 +6,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.hrm.markdown.parser.ast.*
 import com.hrm.markdown.renderer.LocalMarkdownTheme
 import com.hrm.markdown.renderer.LocalRendererDocument
+
+private fun List<IntRange>.flattenLineNumbers(): Set<Int> = buildSet {
+    for (range in this@flattenLineNumbers) {
+        addAll(range)
+    }
+}
 
 /**
  * 块级节点分发器。
@@ -20,6 +27,7 @@ import com.hrm.markdown.renderer.LocalRendererDocument
 @Composable
 internal fun BlockRenderer(
     node: Node,
+    renderRevision: String = "",
     modifier: Modifier = Modifier,
 ) {
     when (node) {
@@ -27,8 +35,23 @@ internal fun BlockRenderer(
         is SetextHeading -> SetextHeadingRenderer(node, modifier)
         is Paragraph -> ParagraphRenderer(node, modifier)
         is ThematicBreak -> ThematicBreakRenderer(modifier)
-        is FencedCodeBlock -> FencedCodeBlockRenderer(node, modifier)
-        is IndentedCodeBlock -> IndentedCodeBlockRenderer(node, modifier)
+        is FencedCodeBlock -> key(renderRevision) {
+            FencedCodeBlockRenderer(
+                text = node.literal,
+                language = node.language,
+                title = node.attributes.pairs["title"],
+                showLineNumbers = node.showLineNumbers,
+                startLine = node.startLineNumber,
+                highlightedLines = node.highlightLines.flattenLineNumbers(),
+                modifier = modifier,
+            )
+        }
+        is IndentedCodeBlock -> key(renderRevision) {
+            IndentedCodeBlockRenderer(
+                text = node.literal,
+                modifier = modifier,
+            )
+        }
         is BlockQuote -> BlockQuoteRenderer(node, modifier)
         is ListBlock -> ListBlockRenderer(node, modifier)
         is HtmlBlock -> HtmlBlockRenderer(node, modifier)
@@ -59,6 +82,12 @@ internal fun BlockRenderer(
             }
         }
     }
+}
+
+internal fun blockRenderRevision(node: Node): String = when (node) {
+    is FencedCodeBlock -> "${node.lineRange.endLine}:${node.literal.length}"
+    is IndentedCodeBlock -> "${node.lineRange.endLine}:${node.literal.length}"
+    else -> "${node.lineRange.endLine}"
 }
 
 /**

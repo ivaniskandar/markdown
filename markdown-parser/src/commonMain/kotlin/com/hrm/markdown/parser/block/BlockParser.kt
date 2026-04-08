@@ -741,6 +741,7 @@ class BlockParser(
                 // skip the opening fence line itself (content starts on the next line)
                 if (lineIdx > tip.contentStartLine) {
                     tip.contentLines.add(lineContent)
+                    syncOpenFencedCodeLiteral(node, tip)
                 }
             }
             is IndentedCodeBlock -> {
@@ -848,6 +849,21 @@ class BlockParser(
         }
     }
 
+    private fun syncOpenFencedCodeLiteral(
+        node: FencedCodeBlock,
+        tip: OpenBlock,
+    ) {
+        if (!tip.isFenced) return
+        if (tip.contentLines.isEmpty()) {
+            node.literal = ""
+            return
+        }
+        node.literal = tip.contentLines.joinToString("\n")
+        if (!node.literal.endsWith('\n')) {
+            node.literal += "\n"
+        }
+    }
+
     private fun handleBlankLine(tip: OpenBlock, lineIdx: Int) {
         when (tip.node) {
             is IndentedCodeBlock -> {
@@ -855,6 +871,7 @@ class BlockParser(
             }
             is FencedCodeBlock -> {
                 tip.contentLines.add("")
+                syncOpenFencedCodeLiteral(tip.node as FencedCodeBlock, tip)
             }
             is Paragraph -> {
                 // 空行结束段落

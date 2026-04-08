@@ -8,9 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import com.hrm.codehigh.renderer.CodeBlock
 import com.hrm.codehigh.theme.LocalCodeTheme
-import com.hrm.markdown.parser.ast.FencedCodeBlock
-import com.hrm.markdown.parser.ast.IndentedCodeBlock
 import com.hrm.markdown.renderer.LocalCodeHighlightTheme
+import com.hrm.markdown.renderer.LocalIsStreaming
 import com.hrm.markdown.renderer.LocalMarkdownTheme
 
 /**
@@ -23,16 +22,21 @@ import com.hrm.markdown.renderer.LocalMarkdownTheme
  */
 @Composable
 internal fun FencedCodeBlockRenderer(
-    node: FencedCodeBlock,
+    text: String,
+    language: String,
+    title: String?,
+    showLineNumbers: Boolean,
+    startLine: Int,
+    highlightedLines: Set<Int>,
     modifier: Modifier = Modifier,
 ) {
     CodeBlockText(
-        text = node.literal.ifEmpty { " " },
-        language = node.language,
-        title = node.attributes.pairs["title"],
-        showLineNumbers = node.showLineNumbers,
-        startLine = node.startLineNumber,
-        highlightedLines = node.highlightLines.flattenLineNumbers(),
+        text = text.ifEmpty { " " },
+        language = language,
+        title = title,
+        showLineNumbers = showLineNumbers,
+        startLine = startLine,
+        highlightedLines = highlightedLines,
         modifier = modifier,
     )
 }
@@ -42,11 +46,11 @@ internal fun FencedCodeBlockRenderer(
  */
 @Composable
 internal fun IndentedCodeBlockRenderer(
-    node: IndentedCodeBlock,
+    text: String,
     modifier: Modifier = Modifier,
 ) {
     CodeBlockText(
-        text = node.literal.ifEmpty { " " },
+        text = text.ifEmpty { " " },
         language = "",
         title = null,
         showLineNumbers = true,
@@ -54,12 +58,6 @@ internal fun IndentedCodeBlockRenderer(
         highlightedLines = emptySet(),
         modifier = modifier,
     )
-}
-
-private fun List<IntRange>.flattenLineNumbers(): Set<Int> = buildSet {
-    for (range in this@flattenLineNumbers) {
-        addAll(range)
-    }
 }
 
 @Composable
@@ -74,6 +72,7 @@ private fun CodeBlockText(
 ) {
     val theme = LocalMarkdownTheme.current
     val codeTheme = LocalCodeHighlightTheme.current ?: LocalCodeTheme.current
+    val isStreaming = LocalIsStreaming.current
 
     Column(
         modifier = modifier
@@ -85,6 +84,7 @@ private fun CodeBlockText(
             language = language,
             title = title.orEmpty(),
             modifier = Modifier.fillMaxWidth(),
+            isStreaming = isStreaming,
             theme = codeTheme,
             showLineNumbers = showLineNumbers,
             startLine = startLine,
