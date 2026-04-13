@@ -306,10 +306,21 @@ private fun AnnotatedString.Builder.renderInlineNode(
                 // 回退：粗略估算
                 (fontSize * estimateLatexWidth(node.literal)).sp
             }
-            val placeholderHeight = if (dims != null && density != null) {
-                with(density) { dims.heightPx.toSp() }
+            // 行内公式常常包含上下标/分式，实际绘制高度可能接近或超过正文行高。
+            // Placeholder 高度过小会导致上下行重叠，因此这里增加安全余量，并保证最小高度不低于正文 lineHeight。
+            val placeholderHeight = if (density != null) {
+                val measuredHeightSp = if (dims != null) {
+                    with(density) { dims.heightPx.toSp().value }
+                } else {
+                    fontSize * 1.5f
+                }
+                val minLineHeightSpValue = theme.bodyStyle.lineHeight.value.takeUnless { it.isNaN() }
+                    ?: theme.bodyStyle.fontSize.value.takeUnless { it.isNaN() }?.times(1.5f)
+                    ?: (fontSize * 1.5f)
+                val extraSp = with(density) { 2f.toDp().toPx().toSp().value }
+                (maxOf(measuredHeightSp, minLineHeightSpValue) + extraSp).sp
             } else {
-                (fontSize * 1.5f).sp
+                (fontSize * 1.6f).sp
             }
 
             appendInlineContent(id, node.literal)

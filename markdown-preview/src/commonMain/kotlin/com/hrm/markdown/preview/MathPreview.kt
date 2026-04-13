@@ -25,6 +25,15 @@ internal val mathPreviewGroups = listOf(
                     )
                 }
             ),
+            PreviewItem(
+                id = "inline_tall_formula",
+                title = "高行内公式行高",
+                content = {
+                    Markdown(
+                        markdown = "这是一段带高行内公式的文本：\$\\frac{1}{\\sqrt{1+x^2}} + \\sum_{i=1}^{n} x_i^2\$，修复后该行应自动增高，避免与上下文本重叠。\n 第二行的内容用于检测行高"
+                    )
+                }
+            ),
         )
     ),
     PreviewGroup(
