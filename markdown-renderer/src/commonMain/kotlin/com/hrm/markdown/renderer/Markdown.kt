@@ -72,7 +72,6 @@ private const val TAG_RENDER = "MarkdownRender"
  * @param theme 可选的自定义主题，默认跟随系统日夜间模式
  * @param config 解析配置，控制 Markdown 方言（Flavour）和解析行为，默认使用 [MarkdownConfig.Default]（ExtendedFlavour 全功能）
  * @param scrollState 滚动状态，外部可控制滚动位置
- * @param retainStateOnChange 当 markdown 变化时是否保留旧内容直到新内容解析完成（避免闪烁）
  * @param enablePagination 是否启用分页加载，适合超长文档（> 500 段落）
  * @param initialBlockCount 分页模式下初始渲染的块数量
  * @param imageContent 自定义图片渲染组件，null 则使用默认占位渲染
@@ -87,7 +86,6 @@ fun Markdown(
     config: MarkdownConfig = MarkdownConfig.Default,
     scrollState: ScrollState = rememberScrollState(),
     isStreaming: Boolean = false,
-    retainStateOnChange: Boolean = false,
     enablePagination: Boolean = false,
     enableScroll: Boolean = true,
     initialBlockCount: Int = 100,
@@ -127,7 +125,6 @@ fun Markdown(
  * @param theme 可选的自定义主题，默认跟随系统日夜间模式
  * @param config 解析配置，控制 Markdown 方言（Flavour）和解析行为，默认使用 [MarkdownConfig.Default]（ExtendedFlavour 全功能）
  * @param scrollState 滚动状态，外部可控制滚动位置
- * @param retainStateOnChange 当 markdown 变化时是否保留旧内容直到新内容解析完成（避免闪烁）
  * @param enablePagination 是否启用分页加载，适合超长文档（> 500 段落）
  * @param initialBlockCount 分页模式下初始渲染的块数量
  * @param imageContent 自定义图片渲染组件，null 则使用默认占位渲染
@@ -142,7 +139,6 @@ fun Markdown(
     config: MarkdownConfig = MarkdownConfig.Default,
     scrollState: ScrollState = rememberScrollState(),
     isStreaming: Boolean = false,
-    retainStateOnChange: Boolean = false,
     enablePagination: Boolean = false,
     enableScroll: Boolean = true,
     initialBlockCount: Int = 100,
@@ -291,7 +287,7 @@ private fun InnerMarkdown(
     onLinkClick: ((String) -> Unit)? = null,
 ) {
     val latestDocument by rememberUpdatedState(document)
-    var throttledDocument by remember { mutableStateOf(document, neverEqualPolicy()) }
+    var throttledDocument by remember { mutableStateOf(document) }
 
     LaunchedEffect(isStreaming) {
         if (!isStreaming) {
@@ -302,7 +298,10 @@ private fun InnerMarkdown(
         while (true) {
             withFrameNanos { }
             delay(16L)
-            throttledDocument = latestDocument
+            val upstream = latestDocument
+            if (upstream !== throttledDocument) {
+                throttledDocument = upstream
+            }
         }
     }
 
@@ -355,16 +354,12 @@ private fun InnerMarkdown(
     }
 
     // 计算实际渲染的块列表
-    // 注意：直接读取 blockNodesState.value 而非局部变量，确保 derivedStateOf 能追踪状态变化
-    val renderBlocks by remember {
-        derivedStateOf {
-            val nodes = blockNodesState.value
-            if (enablePagination) {
-                nodes.take(effectiveVisibleBlockCount)
-            } else {
-                nodes
-            }
-        }
+    // Use a plain expression here to ensure pagination-related inputs are always reflected.
+    val renderBlocks: List<Node> = run {
+        val nodes = blockNodesState.value
+        if (!enablePagination || effectiveVisibleBlockCount >= nodes.size) return@run nodes
+        if (effectiveVisibleBlockCount <= 0) return@run emptyList()
+        nodes.subList(0, effectiveVisibleBlockCount)
     }
 
     val footnoteNavigationState = remember { FootnoteNavigationState() }
