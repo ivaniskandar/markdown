@@ -7,7 +7,10 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.MeasurePolicy
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -140,7 +143,12 @@ private fun InlineFlowMeasuredContent(
             val width = flowLayout.widthPx.roundToInt().coerceIn(constraints.minWidth, constraints.maxWidth)
             val height = flowLayout.heightPx.roundToInt().coerceIn(constraints.minHeight, constraints.maxHeight)
 
-            layout(width, height) {
+            val alignmentLines = mutableMapOf<AlignmentLine, Int>().apply {
+                flowLayout.firstBaselinePx?.let { put(FirstBaseline, it.roundToInt()) }
+                flowLayout.lastBaselinePx?.let { put(LastBaseline, it.roundToInt()) }
+            }
+
+            layout(width, height, alignmentLines = alignmentLines) {
                 var y = 0f
                 var pIndex = 0
                 for (line in flowLayout.lines) {
@@ -237,6 +245,8 @@ private fun inlineFlowMeasurePolicy(
 private data class InlineFlowLayout(
     val widthPx: Float,
     val heightPx: Float,
+    val firstBaselinePx: Float? = null,
+    val lastBaselinePx: Float? = null,
     val lines: List<InlineFlowLine>,
 )
 
@@ -244,6 +254,7 @@ private data class InlineFlowLine(
     val textStyle: TextStyle,
     val lineWidthPx: Float,
     val lineHeightPx: Float,
+    val baselinePx: Float,
     val textAlign: TextAlign,
     val items: List<LineItem>,
 )
@@ -256,6 +267,7 @@ private sealed class LineItem {
         val text: AnnotatedString,
         override val widthPx: Float,
         override val heightPx: Float,
+        val baselinePx: Float,
     ) : LineItem()
 
     data class InlineItem(
@@ -285,9 +297,20 @@ private fun computeInlineFlowLayout(
     val tokens = tokenizeAnnotatedString(annotated, inlineContents)
     val textStyle = textMeasurementStyle(style)
     val baseLineHeightPx = baseLineHeightPx(style, density)
+    val baseMetrics = textMeasurer.measure(
+        text = "Ag",
+        style = textStyle,
+        constraints = Constraints(maxWidth = Int.MAX_VALUE),
+        maxLines = 1,
+        softWrap = false,
+    )
+    val baseTextHeightPx = baseMetrics.size.height.toFloat()
+    val baseTextBaselinePx = baseMetrics.firstBaseline
 
-    fun measureText(a: AnnotatedString): Pair<Float, Float> {
-        if (a.isEmpty()) return 0f to 0f
+    data class MeasuredText(val widthPx: Float, val heightPx: Float, val baselinePx: Float)
+
+    fun measureText(a: AnnotatedString): MeasuredText {
+        if (a.isEmpty()) return MeasuredText(0f, 0f, 0f)
         val res = textMeasurer.measure(
             text = a,
             style = textStyle,
@@ -295,7 +318,11 @@ private fun computeInlineFlowLayout(
             maxLines = 1,
             softWrap = false,
         )
-        return res.size.width.toFloat() to res.size.height.toFloat()
+        return MeasuredText(
+            widthPx = res.size.width.toFloat(),
+            heightPx = res.size.height.toFloat(),
+            baselinePx = res.firstBaseline,
+        )
     }
 
     fun inlineSizePx(id: String): Pair<Float, Float> {
@@ -313,10 +340,18 @@ private fun computeInlineFlowLayout(
 
     fun flushLine(force: Boolean = false) {
         if (!force && currentItems.isEmpty()) return
+        val lineHeightPx = maxOf(baseLineHeightPx, maxItemHeight)
+        val firstTextBaselinePx = currentItems.firstNotNullOfOrNull { item ->
+            (item as? LineItem.TextItem)?.let { textItem ->
+                ((lineHeightPx - textItem.heightPx) / 2f).coerceAtLeast(0f) + textItem.baselinePx
+            }
+        }
         lines += InlineFlowLine(
             textStyle = textStyle,
             lineWidthPx = currentWidth,
-            lineHeightPx = maxOf(baseLineHeightPx, maxItemHeight),
+            lineHeightPx = lineHeightPx,
+            baselinePx = firstTextBaselinePx
+                ?: (((lineHeightPx - baseTextHeightPx) / 2f).coerceAtLeast(0f) + baseTextBaselinePx),
             textAlign = style.textAlign,
             items = currentItems.toList(),
         )
@@ -353,10 +388,19 @@ private fun computeInlineFlowLayout(
             is Token.Text -> {
                 var remaining = token.annotated
                 while (remaining.isNotEmpty() && lineCount < maxLines) {
-                    val (w, h) = measureText(remaining)
+                    val measured = measureText(remaining)
+                    val w = measured.widthPx
+                    val h = measured.heightPx
                     val used = currentWidth
                     if (used + w <= maxWidthPx) {
-                        currentItems.add(LineItem.TextItem(remaining, w, h))
+                        currentItems.add(
+                            LineItem.TextItem(
+                                text = remaining,
+                                widthPx = w,
+                                heightPx = h,
+                                baselinePx = measured.baselinePx,
+                            )
+                        )
                         currentWidth += w
                         maxItemHeight = maxOf(maxItemHeight, h)
                         break
@@ -369,8 +413,17 @@ private fun computeInlineFlowLayout(
                         maxWidthPx = (maxWidthPx - used).coerceAtLeast(1f),
                     )
                     if (fit.fit.isNotEmpty()) {
-                        val (fw, fh) = measureText(fit.fit)
-                        currentItems.add(LineItem.TextItem(fit.fit, fw, fh))
+                        val fitMeasured = measureText(fit.fit)
+                        val fw = fitMeasured.widthPx
+                        val fh = fitMeasured.heightPx
+                        currentItems.add(
+                            LineItem.TextItem(
+                                text = fit.fit,
+                                widthPx = fw,
+                                heightPx = fh,
+                                baselinePx = fitMeasured.baselinePx,
+                            )
+                        )
                         currentWidth += fw
                         maxItemHeight = maxOf(maxItemHeight, fh)
                     }
@@ -382,9 +435,21 @@ private fun computeInlineFlowLayout(
     }
     if (lineCount < maxLines) flushLine(force = false)
 
+    val totalHeightPx = lines.sumOf { it.lineHeightPx.toDouble() }.toFloat()
+    val firstBaselinePx = lines.firstOrNull()?.baselinePx
+    val lastBaselinePx = if (lines.isEmpty()) null else {
+        var y = 0f
+        for (i in 0 until lines.lastIndex) {
+            y += lines[i].lineHeightPx
+        }
+        y + lines.last().baselinePx
+    }
+
     return InlineFlowLayout(
         widthPx = maxWidthPx,
-        heightPx = lines.sumOf { it.lineHeightPx.toDouble() }.toFloat(),
+        heightPx = totalHeightPx,
+        firstBaselinePx = firstBaselinePx,
+        lastBaselinePx = lastBaselinePx,
         lines = lines,
     )
 }

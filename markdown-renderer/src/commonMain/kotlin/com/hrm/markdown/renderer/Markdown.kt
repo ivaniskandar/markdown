@@ -389,10 +389,7 @@ private fun InnerMarkdown(
                 val returnPosition = footnoteNavigationState.getReturnPosition(label)
                 if (returnPosition != null && enableScroll) {
                     scrollState.animateScrollTo(returnPosition)
-                    return@launch
                 }
-
-                footnoteNavigationState.bringReferenceIntoView(label)
             }
             Unit
         }

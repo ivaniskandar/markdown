@@ -1,12 +1,9 @@
 package com.hrm.markdown.renderer.inline
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,7 +39,6 @@ import com.hrm.latex.renderer.measure.rememberLatexMeasurer
 import com.hrm.latex.renderer.model.LatexConfig
 import com.hrm.markdown.parser.ast.*
 import com.hrm.markdown.renderer.LocalCodeHighlightTheme
-import com.hrm.markdown.renderer.LocalFootnoteNavigationState
 import com.hrm.markdown.renderer.LocalMarkdownTheme
 import com.hrm.markdown.renderer.LocalOnFootnoteClick
 import com.hrm.markdown.renderer.MarkdownTheme
@@ -318,50 +314,21 @@ private fun AnnotatedString.Builder.renderInlineNode(
 
         is FootnoteReference -> {
             val referenceText = "[${node.index}]"
-            if (density != null && textMeasurer != null) {
-                val referenceStyle = hostTextStyle.copy(
-                    color = theme.linkColor,
-                    fontSize = theme.footnoteStyle.fontSize,
-                )
-                val size = textMeasurer.measure(referenceText, style = referenceStyle).size
-                val id = "footnote_ref_${node.hashCode()}"
-                appendInlinePlaceholder(id)
-                val itc = InlineTextContent(
-                    placeholder = Placeholder(
-                        width = with(density) { size.width.toSp() },
-                        height = hostTextStyle.lineHeight,
-                        placeholderVerticalAlign = PlaceholderVerticalAlign.TextTop,
+            val linkAnnotation = LinkAnnotation.Clickable(
+                tag = "footnote",
+                styles = TextLinkStyles(
+                    style = SpanStyle(
+                        color = theme.linkColor,
+                        fontSize = theme.footnoteStyle.fontSize,
+                        baselineShift = BaselineShift.Superscript,
                     ),
-                ) {
-                    FootnoteReferenceContent(
-                        label = node.label,
-                        text = referenceText,
-                        hostTextStyle = hostTextStyle,
-                        theme = theme,
-                        onFootnoteClick = onFootnoteClick,
-                    )
-                }
-                inlineContents[id] = InlineContentEntry(
-                    alternateText = referenceText,
-                    inlineTextContent = itc,
-                )
-            } else {
-                val linkAnnotation = LinkAnnotation.Clickable(
-                    tag = "footnote",
-                    styles = TextLinkStyles(
-                        style = SpanStyle(
-                            color = theme.linkColor,
-                            fontSize = theme.footnoteStyle.fontSize,
-                            baselineShift = BaselineShift.Superscript,
-                        ),
-                    ),
-                    linkInteractionListener = {
-                        onFootnoteClick?.invoke(node.label)
-                    },
-                )
-                withLink(linkAnnotation) {
-                    append(referenceText)
-                }
+                ),
+                linkInteractionListener = {
+                    onFootnoteClick?.invoke(node.label)
+                },
+            )
+            withLink(linkAnnotation) {
+                append(referenceText)
             }
         }
 
@@ -616,43 +583,6 @@ private fun AnnotatedString.Builder.renderInlineNode(
             }
         }
     }
-}
-
-@Composable
-private fun FootnoteReferenceContent(
-    label: String,
-    text: String,
-    hostTextStyle: TextStyle,
-    theme: MarkdownTheme,
-    onFootnoteClick: ((String) -> Unit)?,
-) {
-    val footnoteNavigationState = LocalFootnoteNavigationState.current
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-
-    DisposableEffect(footnoteNavigationState, label, bringIntoViewRequester) {
-        footnoteNavigationState?.registerReference(label, bringIntoViewRequester)
-        onDispose {
-            footnoteNavigationState?.unregisterReference(label, bringIntoViewRequester)
-        }
-    }
-
-    BasicText(
-        text = buildAnnotatedString {
-            withStyle(
-                SpanStyle(
-                    color = theme.linkColor,
-                    fontSize = theme.footnoteStyle.fontSize,
-                    baselineShift = BaselineShift.Superscript,
-                )
-            ) {
-                append(text)
-            }
-        },
-        modifier = Modifier
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .clickable { onFootnoteClick?.invoke(label) },
-        style = hostTextStyle,
-    )
 }
 
 /**
