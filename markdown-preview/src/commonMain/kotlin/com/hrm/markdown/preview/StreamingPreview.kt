@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -166,28 +167,23 @@ private fun StreamingMarkdownDemo() {
                 }
 
                 launch {
-                    snapshotFlow { scrollState.value to scrollState.maxValue }
-                        .collect { (value, maxValue) ->
-                            if (!autoFollow && maxValue > 0 && value >= maxValue - 100) {
+                    snapshotFlow { Triple(scrollState.value, scrollState.maxValue, autoFollow) }
+                        .collect { (value, maxValue, follow) ->
+                            if (!follow && maxValue > 0 && value >= maxValue - 100) {
                                 autoFollow = true
                             }
                         }
                 }
 
-                while (true) {
-                    delay(16L)
-                    if (!autoFollow) continue
-                    val maxValue = scrollState.maxValue
-                    val currentValue = scrollState.value
-                    val remaining = maxValue - currentValue
-                    if (remaining > 0) {
-                        if (remaining <= 10) {
-                            scrollState.scrollTo(maxValue)
-                        } else {
-                            val step = (remaining * 0.35f).toInt().coerceAtLeast(1)
-                            scrollState.scrollTo(currentValue + step)
+                launch {
+                    snapshotFlow { scrollState.maxValue to autoFollow }
+                        .collect { (maxValue, follow) ->
+                            if (!follow) return@collect
+                            withFrameNanos { }
+                            if (kotlin.math.abs(scrollState.value - maxValue) > 6) {
+                                scrollState.scrollTo(maxValue)
+                            }
                         }
-                    }
                 }
             }
 

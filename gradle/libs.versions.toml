@@ -1,7 +1,7 @@
 [versions]
 agp = "9.0.1"
 android-compileSdk = "36"
-android-minSdk = "24"
+android-minSdk = "23"
 android-targetSdk = "36"
 androidx-activity = "1.12.4"
 androidx-appcompat = "1.7.1"
@@ -20,6 +20,7 @@ material3 = "1.10.0-alpha05"
 lifecycleRuntimeKtx = "2.10.0"
 composeBom = "2026.02.01"
 latex = '0.1.0'
+codehigh = '1.0.6'
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -61,6 +62,8 @@ ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
 latex-base = { module = "xyz.ivaniskandar:latex-base", version.ref = "latex" }
 latex-parser = { module = "xyz.ivaniskandar:latex-parser", version.ref = "latex" }
 latex-renderer = { module = "xyz.ivaniskandar:latex-renderer", version.ref = "latex" }
+
+codehigh = { module = "io.github.huarangmeng:codehighlight", version.ref = "codehigh" }
 
 [bundles]
 latex = ["latex-base", "latex-parser", "latex-renderer"]

@@ -6,17 +6,23 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.rememberTextMeasurer
+import com.hrm.codehigh.theme.LocalCodeTheme
 import com.hrm.markdown.parser.ast.Image
 import com.hrm.markdown.parser.ast.Node
 import com.hrm.markdown.parser.ast.Paragraph
 import com.hrm.markdown.parser.ast.Text
 import com.hrm.markdown.renderer.DefaultMarkdownImage
+import com.hrm.markdown.renderer.LocalCodeHighlightTheme
 import com.hrm.markdown.renderer.LocalImageRenderer
 import com.hrm.markdown.renderer.LocalMarkdownTheme
+import com.hrm.markdown.renderer.LocalOnFootnoteClick
 import com.hrm.markdown.renderer.LocalOnLinkClick
 import com.hrm.markdown.renderer.MarkdownImageData
 import com.hrm.latex.renderer.measure.rememberLatexMeasurer
 import com.hrm.markdown.renderer.inline.buildInlineAnnotatedString
+import com.hrm.markdown.renderer.inline.InlineFlowText
+import com.hrm.markdown.renderer.inline.InlineContentEntry
 import com.hrm.markdown.renderer.inline.rememberInlineContent
 
 /**
@@ -53,13 +59,16 @@ private fun SimpleParagraphRenderer(
 ) {
     val theme = LocalMarkdownTheme.current
     val onLinkClick = LocalOnLinkClick.current
-    val (annotated, inlineContents) = rememberInlineContent(node, onLinkClick)
-
-    BasicText(
-        text = annotated,
+    val inlineResult = rememberInlineContent(
+        parent = node,
+        onLinkClick = onLinkClick,
+        hostTextStyle = theme.bodyStyle,
+    )
+    InlineFlowText(
+        annotated = inlineResult.annotated,
+        inlineContents = inlineResult.inlineContents,
         modifier = modifier.fillMaxWidth(),
         style = theme.bodyStyle,
-        inlineContent = inlineContents,
     )
 }
 
@@ -85,9 +94,12 @@ private fun MixedParagraphRenderer(
 ) {
     val theme = LocalMarkdownTheme.current
     val onLinkClick = LocalOnLinkClick.current
+    val onFootnoteClick = LocalOnFootnoteClick.current
     val customRenderer = LocalImageRenderer.current
     val latexMeasurer = rememberLatexMeasurer()
     val density = androidx.compose.ui.platform.LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    val codeTheme = LocalCodeHighlightTheme.current ?: LocalCodeTheme.current
 
     // 将段落子节点拆分为文本段和图片段
     val segments = remember(node) { splitParagraphSegments(node.children) }
@@ -96,16 +108,25 @@ private fun MixedParagraphRenderer(
         for (segment in segments) {
             when (segment) {
                 is ParagraphSegment.TextRun -> {
-                    val inlineContents = mutableMapOf<String, androidx.compose.foundation.text.InlineTextContent>()
+                    val inlineContents = mutableMapOf<String, InlineContentEntry>()
                     val annotated = buildInlineAnnotatedString(
-                        segment.nodes, theme, inlineContents, onLinkClick, latexMeasurer, density
+                        nodes = segment.nodes,
+                        theme = theme,
+                        hostTextStyle = theme.bodyStyle,
+                        inlineContents = inlineContents,
+                        onLinkClick = onLinkClick,
+                        onFootnoteClick = onFootnoteClick,
+                        latexMeasurer = latexMeasurer,
+                        density = density,
+                        textMeasurer = textMeasurer,
+                        codeTheme = codeTheme,
                     )
                     if (annotated.isNotEmpty()) {
-                        BasicText(
-                            text = annotated,
+                        InlineFlowText(
+                            annotated = annotated,
+                            inlineContents = inlineContents,
                             modifier = Modifier.fillMaxWidth(),
                             style = theme.bodyStyle,
-                            inlineContent = inlineContents,
                         )
                     }
                 }

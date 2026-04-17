@@ -8,7 +8,7 @@
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.10.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.huarangmeng/markdown-parser.svg?color=orange&label=Maven%20Central)](https://central.sonatype.com/search?q=io.github.huarangmeng.markdown)
 [![CommonMark](https://img.shields.io/badge/CommonMark%200.31.2-652%2F652%20✓-brightgreen)](https://spec.commonmark.org/0.31.2/)
-[![Android API](https://img.shields.io/badge/Android%20API-24%2B-34A853?logo=android&logoColor=white)](https://android-arsenal.com/api?level=24)
+[![Android API](https://img.shields.io/badge/Android%20API-23%2B-34A853?logo=android&logoColor=white)](https://android-arsenal.com/api?level=24)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 *One library. One codebase. Pixel-perfect Markdown on Android, iOS, Desktop & Web.*
@@ -94,6 +94,7 @@ dependencies {
 ```kotlin
 import com.hrm.markdown.renderer.Markdown
 import com.hrm.markdown.renderer.MarkdownTheme
+import com.hrm.codehigh.theme.OneDarkProTheme
 
 @Composable
 fun MyScreen() {
@@ -112,6 +113,7 @@ fun MyScreen() {
         """.trimIndent(),
         modifier = Modifier.fillMaxSize(),
         theme = MarkdownTheme.auto(), // Follows system light/dark mode
+        codeTheme = OneDarkProTheme,  // Optional: pass a codehigh theme directly
     )
 }
 ```
@@ -172,6 +174,35 @@ Markdown(
     onLinkClick = { url -> /* handle click */ },
 )
 ```
+
+Code highlighting and code block/inline code theming are provided by the `codehigh` library. `markdown-renderer` no longer bundles its own regex-based highlighter.
+
+```kotlin
+import com.hrm.codehigh.theme.DraculaProTheme
+import com.hrm.codehigh.theme.LocalCodeTheme
+import com.hrm.codehigh.theme.OneDarkProTheme
+
+// Option 1: Pass codehigh theme per Markdown call
+Markdown(
+    markdown = text,
+    theme = MarkdownTheme.auto(),
+    codeTheme = OneDarkProTheme,
+)
+
+// Option 2: Provide a default codehigh theme globally via CompositionLocal
+CompositionLocalProvider(
+    LocalCodeTheme provides DraculaProTheme
+) {
+    Markdown(
+        markdown = text,
+        theme = MarkdownTheme.auto(),
+    )
+}
+```
+
+- `theme` controls general Markdown UI (headings, body, tables, quotes, math, etc.)
+- `codeTheme` controls code highlighting and styling for code blocks and inline code
+- If `codeTheme` is not provided, the default from `codehigh` is used
 
 ---
 

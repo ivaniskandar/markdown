@@ -25,6 +25,15 @@ internal val mathPreviewGroups = listOf(
                     )
                 }
             ),
+            PreviewItem(
+                id = "inline_tall_formula",
+                title = "高行内公式行高",
+                content = {
+                    Markdown(
+                        markdown = "这是一段带高行内公式的文本：\$\\frac{1}{\\sqrt{1+x^2}} + \\sum_{i=1}^{n} x_i^2\$，修复后该行应自动增高，避免与上下文本重叠。第二行的内容用于检测行高"
+                    )
+                }
+            ),
         )
     ),
     PreviewGroup(
@@ -53,6 +62,19 @@ $$
                         markdown = """
 $$
 \text{Speedup} = \frac{T_{full}}{T_{incremental}} = \frac{O(n)}{O(k)} \approx \frac{n}{k}
+$$
+                        """.trimIndent()
+                    )
+                }
+            ),
+            PreviewItem(
+                id = "horizontal_scroll",
+                title = "超长公式横向滚动",
+                content = {
+                    Markdown(
+                        markdown = """
+$$
+\operatorname{score}(x)=\sum_{i=1}^{n}\frac{\alpha_i\beta_i\gamma_i\delta_i}{1+\exp\left(-\frac{x_i-\mu_i}{\sigma_i+\varepsilon}\right)}+\prod_{j=1}^{m}\left(1+\frac{\lambda_j^2}{\omega_j^2+\theta_j^2}\right)+\int_{0}^{T}\frac{\sin(\kappa t)+\cos(\rho t)}{\sqrt{1+t^2}}\,dt
 $$
                         """.trimIndent()
                     )

@@ -14,7 +14,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.hrm.markdown.renderer.highlight.SyntaxColorScheme
 
 /**
  * Markdown 渲染的完整主题配置。
@@ -112,8 +111,6 @@ data class MarkdownTheme(
     val abbreviationStyle: SpanStyle = SpanStyle(
         textDecoration = TextDecoration.Underline,
     ),
-    /** 代码块语法高亮配色方案 */
-    val syntaxColorScheme: SyntaxColorScheme = SyntaxColorScheme.GitHubLight,
     /** 代码块标题栏背景色 */
     val codeBlockTitleBackground: Color = Color(0xFFEBEDF0),
     /** 代码块标题栏文字样式 */
@@ -122,10 +119,6 @@ data class MarkdownTheme(
         fontWeight = FontWeight.Medium,
         fontFamily = FontFamily.Monospace,
     ),
-    /** 代码块行号文字颜色 */
-    val codeBlockLineNumberColor: Color = Color(0xFF8C959F),
-    /** 代码块高亮行背景色 */
-    val codeBlockHighlightLineColor: Color = Color(0xFFFFF8C5),
     /** 剧透文本遮挡色（文字颜色和背景色相同，点击后显示） */
     val spoilerColor: Color = Color(0xFF3A3A3A),
 ) {
@@ -163,10 +156,7 @@ data class MarkdownTheme(
             mathColor = Color(0xFFE6EDF3),
             admonitionStyles = darkAdmonitionStyles(),
             kbdBackground = Color(0xFF343942),
-            syntaxColorScheme = SyntaxColorScheme.GitHubDark,
             codeBlockTitleBackground = Color(0xFF21262D),
-            codeBlockLineNumberColor = Color(0xFF484F58),
-            codeBlockHighlightLineColor = Color(0xFF3B2E00),
             spoilerColor = Color(0xFF3D444D),
         )
 

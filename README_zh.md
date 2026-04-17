@@ -8,7 +8,7 @@
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.10.1-4285F4?logo=jetpackcompose&logoColor=white)](https://www.jetbrains.com/lp/compose-multiplatform/)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.huarangmeng/markdown-parser.svg?color=orange&label=Maven%20Central)](https://central.sonatype.com/search?q=io.github.huarangmeng.markdown)
 [![CommonMark](https://img.shields.io/badge/CommonMark%200.31.2-652%2F652%20✓-brightgreen)](https://spec.commonmark.org/0.31.2/)
-[![Android API](https://img.shields.io/badge/Android%20API-24%2B-34A853?logo=android&logoColor=white)](https://android-arsenal.com/api?level=24)
+[![Android API](https://img.shields.io/badge/Android%20API-23%2B-34A853?logo=android&logoColor=white)](https://android-arsenal.com/api?level=24)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 *一套代码，像素级一致。在 Android、iOS、Desktop 和 Web 上完美渲染 Markdown。*
@@ -94,6 +94,7 @@ dependencies {
 ```kotlin
 import com.hrm.markdown.renderer.Markdown
 import com.hrm.markdown.renderer.MarkdownTheme
+import com.hrm.codehigh.theme.OneDarkProTheme
 
 @Composable
 fun MyScreen() {
@@ -112,6 +113,7 @@ fun MyScreen() {
         """.trimIndent(),
         modifier = Modifier.fillMaxSize(),
         theme = MarkdownTheme.auto(), // 自动跟随系统日夜间模式
+        codeTheme = OneDarkProTheme, // 可选：直接传入 codehigh 主题
     )
 }
 ```
@@ -172,6 +174,35 @@ Markdown(
     onLinkClick = { url -> /* 处理链接点击 */ },
 )
 ```
+
+代码高亮与代码块/行内代码主题由 `codehigh` 提供，`markdown-renderer` 不再内置独立的语法高亮器。
+
+```kotlin
+import com.hrm.codehigh.theme.DraculaProTheme
+import com.hrm.codehigh.theme.LocalCodeTheme
+import com.hrm.codehigh.theme.OneDarkProTheme
+
+// 方式 1：对单个 Markdown 直接传入 codehigh 主题
+Markdown(
+    markdown = text,
+    theme = MarkdownTheme.auto(),
+    codeTheme = OneDarkProTheme,
+)
+
+// 方式 2：通过 codehigh 的 CompositionLocal 统一注入默认代码主题
+CompositionLocalProvider(
+    LocalCodeTheme provides DraculaProTheme
+) {
+    Markdown(
+        markdown = text,
+        theme = MarkdownTheme.auto(),
+    )
+}
+```
+
+- `theme` 负责普通 Markdown 内容样式，如标题、正文、表格、引用、数学公式等
+- `codeTheme` 只负责代码块与行内代码的高亮和配色
+- 如果不传 `codeTheme`，则使用 `codehigh` 当前的默认主题
 
 ---
 

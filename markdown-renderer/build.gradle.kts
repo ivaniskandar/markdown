@@ -47,6 +47,7 @@ kotlin {
             implementation(libs.compose.components.resources)
 
             implementation(libs.bundles.latex)
+            implementation(libs.codehigh)
 
             // 图片加载：Coil3 + Ktor3 网络引擎
             implementation(libs.coil.compose)
@@ -54,6 +55,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.core)
         }
         androidMain.dependencies {
             implementation(libs.ktor.client.android)

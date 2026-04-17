@@ -83,19 +83,24 @@ internal class FencedCodeBlockStarter : BlockStarter {
          * these are extracted from the attribute pairs parsed by AttributeParser.
          */
         fun parseCodeBlockEnhancements(block: FencedCodeBlock, pairs: Map<String, String>) {
-            // hl_lines="1 3-5" -> list of IntRange
-            pairs["hl_lines"]?.let { hlLines ->
-                block.highlightLines = parseHighlightLines(hlLines)
+            val highlightSpec = pairs["hl_lines"] ?: pairs["highlight"]
+            if (!highlightSpec.isNullOrBlank()) {
+                block.highlightLines = parseHighlightLines(highlightSpec)
             }
 
-            // linenums=true/false
-            pairs["linenums"]?.let { linenums ->
-                block.showLineNumbers = linenums.equals("true", ignoreCase = true)
+            val lineNumbers = when {
+                pairs["linenums"] != null -> pairs["linenums"]!!.equals("true", ignoreCase = true)
+                pairs["linenos"] != null -> pairs["linenos"]!!.equals("true", ignoreCase = true)
+                pairs["lineNumbers"] != null -> pairs["lineNumbers"]!!.equals("true", ignoreCase = true)
+                block.attributes.classes.contains("line-numbers") -> true
+                else -> true
             }
+            block.showLineNumbers = lineNumbers
 
-            // startline=10
-            pairs["startline"]?.let { startline ->
-                startline.toIntOrNull()?.let { block.startLineNumber = it }
+            pairs["startline"]?.toIntOrNull()?.let { startLine ->
+                if (startLine > 0) {
+                    block.startLineNumber = startLine
+                }
             }
         }
 
@@ -104,16 +109,20 @@ internal class FencedCodeBlockStarter : BlockStarter {
          */
         fun parseHighlightLines(spec: String): List<IntRange> {
             val ranges = mutableListOf<IntRange>()
-            for (part in spec.trim().split(Regex("\\s+"))) {
+            for (part in spec.trim().split(Regex("[,\\s]+"))) {
                 if (part.isEmpty()) continue
                 val dashIdx = part.indexOf('-')
                 if (dashIdx > 0) {
                     val start = part.substring(0, dashIdx).toIntOrNull() ?: continue
                     val end = part.substring(dashIdx + 1).toIntOrNull() ?: continue
-                    ranges.add(start..end)
+                    if (start > 0 && end >= start) {
+                        ranges.add(start..end)
+                    }
                 } else {
                     val line = part.toIntOrNull() ?: continue
-                    ranges.add(line..line)
+                    if (line > 0) {
+                        ranges.add(line..line)
+                    }
                 }
             }
             return ranges

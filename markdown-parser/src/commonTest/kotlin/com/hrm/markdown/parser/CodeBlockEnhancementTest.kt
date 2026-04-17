@@ -40,6 +40,13 @@ class CodeBlockEnhancementTest {
         assertEquals(3..3, codeBlock.highlightLines[0])
     }
 
+    @Test
+    fun should_parse_highlight_alias_with_commas() {
+        val doc = parse("```js {highlight=\"1,3-4\"}\ncode\n```")
+        val codeBlock = doc.children.filterIsInstance<FencedCodeBlock>().first()
+        assertEquals(listOf(1..1, 3..4), codeBlock.highlightLines)
+    }
+
     // ---- line numbers ----
 
     @Test
@@ -54,6 +61,27 @@ class CodeBlockEnhancementTest {
         val doc = parse("```python {linenums=false}\ncode\n```")
         val codeBlock = doc.children.filterIsInstance<FencedCodeBlock>().first()
         assertFalse(codeBlock.showLineNumbers)
+    }
+
+    @Test
+    fun should_parse_linenos_alias() {
+        val doc = parse("```python {linenos=true}\ncode\n```")
+        val codeBlock = doc.children.filterIsInstance<FencedCodeBlock>().first()
+        assertTrue(codeBlock.showLineNumbers)
+    }
+
+    @Test
+    fun should_parse_lineNumbers_alias() {
+        val doc = parse("```python {lineNumbers=true}\ncode\n```")
+        val codeBlock = doc.children.filterIsInstance<FencedCodeBlock>().first()
+        assertTrue(codeBlock.showLineNumbers)
+    }
+
+    @Test
+    fun should_enable_line_numbers_from_class() {
+        val doc = parse("```python {.line-numbers}\ncode\n```")
+        val codeBlock = doc.children.filterIsInstance<FencedCodeBlock>().first()
+        assertTrue(codeBlock.showLineNumbers)
     }
 
     @Test

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +22,7 @@ import com.hrm.markdown.parser.ast.TableHead
 import com.hrm.markdown.parser.ast.TableRow
 import com.hrm.markdown.renderer.LocalMarkdownTheme
 import com.hrm.markdown.renderer.LocalOnLinkClick
+import com.hrm.markdown.renderer.inline.InlineFlowText
 import com.hrm.markdown.renderer.inline.rememberInlineContent
 
 /**
@@ -174,13 +174,17 @@ private fun TableCellRenderer(
         return
     }
 
-    val (annotated, inlineContents) = rememberInlineContent(cell, onLinkClick)
-
+    val inlineResult = rememberInlineContent(
+        parent = cell,
+        onLinkClick = onLinkClick,
+        hostTextStyle = style,
+    )
     Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
-        if (inlineContents.isEmpty()) {
-            BasicText(text = annotated, style = style, maxLines = 1)
-        } else {
-            BasicText(text = annotated, style = style, inlineContent = inlineContents, maxLines = 1)
-        }
+        InlineFlowText(
+            annotated = inlineResult.annotated,
+            inlineContents = inlineResult.inlineContents,
+            style = style,
+            maxLines = 1,
+        )
     }
 }

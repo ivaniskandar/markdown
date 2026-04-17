@@ -1,22 +1,39 @@
 package com.hrm.markdown.renderer.block
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.hrm.markdown.parser.ast.BlankLine
 import com.hrm.markdown.parser.ast.DefinitionDescription
 import com.hrm.markdown.parser.ast.DefinitionList
 import com.hrm.markdown.parser.ast.DefinitionTerm
 import com.hrm.markdown.parser.ast.FootnoteDefinition
 import com.hrm.markdown.parser.ast.HtmlBlock
+import com.hrm.markdown.parser.ast.Paragraph
+import com.hrm.markdown.parser.ast.Node
+import com.hrm.markdown.renderer.LocalFootnoteNavigationState
 import com.hrm.markdown.renderer.LocalMarkdownTheme
+import com.hrm.markdown.renderer.LocalOnFootnoteBackClick
 import com.hrm.markdown.renderer.MarkdownBlockChildren
+import com.hrm.markdown.renderer.inline.InlineFlowText
 import com.hrm.markdown.renderer.inline.rememberInlineContent
 
 /**
@@ -52,9 +69,13 @@ internal fun DefinitionListRenderer(
         for (child in node.children) {
             when (child) {
                 is DefinitionTerm -> {
-                    val (annotated, _) = rememberInlineContent(child)
-                    Text(
-                        text = annotated,
+                    val inlineResult = rememberInlineContent(
+                        parent = child,
+                        hostTextStyle = theme.bodyStyle.copy(fontWeight = FontWeight.Bold),
+                    )
+                    InlineFlowText(
+                        annotated = inlineResult.annotated,
+                        inlineContents = inlineResult.inlineContents,
                         style = theme.bodyStyle.copy(fontWeight = FontWeight.Bold),
                     )
                 }
@@ -79,18 +100,101 @@ internal fun FootnoteDefinitionRenderer(
     modifier: Modifier = Modifier,
 ) {
     val theme = LocalMarkdownTheme.current
+    val footnoteNavigationState = LocalFootnoteNavigationState.current
+    val onFootnoteBackClick = LocalOnFootnoteBackClick.current
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
 
-    Column(modifier = modifier.fillMaxWidth().padding(top = 4.dp)) {
-        Text(
-            text = "[${node.index}] ${node.label}",
-            style = theme.bodyStyle.copy(
-                fontWeight = FontWeight.SemiBold,
+    DisposableEffect(footnoteNavigationState, node.label, bringIntoViewRequester) {
+        footnoteNavigationState?.registerDefinition(node.label, bringIntoViewRequester)
+        onDispose {
+            footnoteNavigationState?.unregisterDefinition(node.label, bringIntoViewRequester)
+        }
+    }
+
+    val contentBlocks = remember(node) {
+        node.children.filter { it !is BlankLine }
+    }
+    val firstBlock = contentBlocks.firstOrNull()
+    val remainingBlocks = if (contentBlocks.size > 1) contentBlocks.drop(1) else emptyList()
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .padding(top = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Text(
+                text = "[${node.index}]",
+                modifier = Modifier.alignByBaseline(),
+                style = theme.bodyStyle.copy(
+                    fontWeight = FontWeight.SemiBold,
                     fontSize = theme.footnoteStyle.fontSize,
-            ),
-        )
-        MarkdownBlockChildren(
-            parent = node,
-            modifier = Modifier.padding(start = 16.dp),
+                ),
+            )
+            Text(
+                text = "↩",
+                modifier = Modifier
+                    .alignByBaseline()
+                    .then(
+                        if (onFootnoteBackClick != null) {
+                            Modifier.clickable { onFootnoteBackClick(node.label) }
+                        } else {
+                            Modifier
+                        }
+                    ),
+                style = theme.bodyStyle.copy(
+                    color = theme.linkColor,
+                    fontSize = theme.footnoteStyle.fontSize,
+                ),
+            )
+            if (firstBlock != null) {
+                key(firstBlock::class, firstBlock.stableKey) {
+                    FootnoteContentBlock(
+                        node = firstBlock,
+                        modifier = Modifier
+                            .weight(1f)
+                            .alignBy(FirstBaseline),
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .alignBy(FirstBaseline)
+                )
+            }
+        }
+        if (remainingBlocks.isNotEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(theme.blockSpacing),
+            ) {
+                for (child in remainingBlocks) {
+                    key(child::class, child.stableKey) {
+                        FootnoteContentBlock(child)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FootnoteContentBlock(
+    node: Node,
+    modifier: Modifier = Modifier,
+) {
+    when (node) {
+        is Paragraph -> ParagraphRenderer(node, modifier.fillMaxWidth())
+        else -> BlockRenderer(
+            node = node,
+            renderRevision = blockRenderRevision(node),
+            modifier = modifier.fillMaxWidth(),
         )
     }
 }

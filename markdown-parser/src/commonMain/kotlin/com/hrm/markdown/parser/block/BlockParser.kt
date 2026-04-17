@@ -510,7 +510,7 @@ class BlockParser(
                     true
                 } else {
                     val snap = cursor.snapshot()
-                    val indent = cursor.advanceSpaces()
+                    val indent = cursor.advanceSpaces(4)
                     if (indent >= 4) {
                         true
                     } else {
@@ -741,6 +741,7 @@ class BlockParser(
                 // skip the opening fence line itself (content starts on the next line)
                 if (lineIdx > tip.contentStartLine) {
                     tip.contentLines.add(lineContent)
+                    syncOpenFencedCodeLiteral(node, tip)
                 }
             }
             is IndentedCodeBlock -> {
@@ -773,10 +774,6 @@ class BlockParser(
                     tip.contentLines.add(source.lineContent(lineIdx))
                 }
             }
-            is FootnoteDefinition -> {
-                // 添加脚注内容
-                tip.contentLines.add(lineContent)
-            }
             is Table -> {
                 // 跳过分隔行（创建表格时分隔行也会被传入 addLineToTip）
                 val rawLine = source.lineContent(lineIdx)
@@ -802,7 +799,7 @@ class BlockParser(
                 node.lineRange = LineRange(node.lineRange.startLine, lineIdx + 1)
             }
             is ListBlock, is ListItem, is BlockQuote, is Document,
-            is DefinitionList, is DefinitionDescription, is CustomContainer,
+            is DefinitionList, is DefinitionDescription, is FootnoteDefinition, is CustomContainer,
             is ShortcodeBlock, is TabBlock, is TabItem -> {
                 // 容器块：创建新段落或处理懒延续
                 handleContainerLine(tip, cursor, lineIdx)
@@ -848,6 +845,21 @@ class BlockParser(
         }
     }
 
+    private fun syncOpenFencedCodeLiteral(
+        node: FencedCodeBlock,
+        tip: OpenBlock,
+    ) {
+        if (!tip.isFenced) return
+        if (tip.contentLines.isEmpty()) {
+            node.literal = ""
+            return
+        }
+        node.literal = tip.contentLines.joinToString("\n")
+        if (!node.literal.endsWith('\n')) {
+            node.literal += "\n"
+        }
+    }
+
     private fun handleBlankLine(tip: OpenBlock, lineIdx: Int) {
         when (tip.node) {
             is IndentedCodeBlock -> {
@@ -855,6 +867,7 @@ class BlockParser(
             }
             is FencedCodeBlock -> {
                 tip.contentLines.add("")
+                syncOpenFencedCodeLiteral(tip.node as FencedCodeBlock, tip)
             }
             is Paragraph -> {
                 // 空行结束段落

@@ -114,7 +114,7 @@ class FencedCodeBlock(
     var highlightLines: List<IntRange> = emptyList()
 
     /** whether to show line numbers, parsed from `linenums` attribute */
-    var showLineNumbers: Boolean = false
+    var showLineNumbers: Boolean = true
 
     /** starting line number, parsed from `startline` attribute (default 1) */
     var startLineNumber: Int = 1

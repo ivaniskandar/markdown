@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import com.hrm.codehigh.theme.CodeTheme
 import com.hrm.markdown.parser.ast.Document
 
 /**
@@ -16,6 +17,8 @@ import com.hrm.markdown.parser.ast.Document
  * - compositionLocalOf 比较引用发现没变 → **跳过所有下游重组**
  */
 internal val LocalOnLinkClick = compositionLocalOf<((String) -> Unit)?> { null }
+internal val LocalOnFootnoteClick = compositionLocalOf<((String) -> Unit)?> { null }
+internal val LocalOnFootnoteBackClick = compositionLocalOf<((String) -> Unit)?> { null }
 
 /**
  * 文档引用，通过 [compositionLocalOf] 在组件树中传递。
@@ -30,33 +33,52 @@ internal val LocalRendererDocument = compositionLocalOf { Document() }
  * Markdown 渲染配置，通过 CompositionLocal 传递。
  */
 internal val LocalMarkdownConfig = compositionLocalOf { MarkdownConfig.Default }
+internal val LocalFootnoteNavigationState = compositionLocalOf<FootnoteNavigationState?> { null }
+
+internal val LocalCodeHighlightTheme = compositionLocalOf<CodeTheme?> { null }
+internal val LocalIsStreaming = compositionLocalOf { false }
 
 @Composable
 internal fun ProvideRendererContext(
     document: Document,
     onLinkClick: ((String) -> Unit)?,
+    onFootnoteClick: ((String) -> Unit)? = null,
+    onFootnoteBackClick: ((String) -> Unit)? = null,
+    footnoteNavigationState: FootnoteNavigationState? = null,
     imageContent: MarkdownImageRenderer? = null,
     config: MarkdownConfig = MarkdownConfig.Default,
+    codeTheme: CodeTheme? = null,
+    isStreaming: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     // 用 rememberUpdatedState 包装 onLinkClick：
-    // - stableOnLinkClick 是一个 remember 的稳定 lambda 引用（对象不变）
-    // - 内部通过 State 读取始终最新的 onLinkClick
+    // - stableOnLinkClick 始终是一个 remember 的稳定 lambda 引用（对象不变）
+    // - 即使当前 onLinkClick 为 null，wrapper 也只是空操作，不会锁死后续更新
+    // - wrapper 内部通过 State 读取始终最新的 onLinkClick
     // - compositionLocalOf 比较引用 === 发现没变 → 跳过下游重组
     val currentOnLinkClick = rememberUpdatedState(onLinkClick)
-    val stableOnLinkClick: ((String) -> Unit)? = remember {
-        if (onLinkClick != null) {
-            { url: String -> currentOnLinkClick.value?.invoke(url) }
-        } else {
-            null
-        }
+    val currentOnFootnoteClick = rememberUpdatedState(onFootnoteClick)
+    val currentOnFootnoteBackClick = rememberUpdatedState(onFootnoteBackClick)
+    val stableOnLinkClick: (String) -> Unit = remember {
+        { url: String -> currentOnLinkClick.value?.invoke(url) }
+    }
+    val stableOnFootnoteClick: (String) -> Unit = remember {
+        { label: String -> currentOnFootnoteClick.value?.invoke(label) }
+    }
+    val stableOnFootnoteBackClick: (String) -> Unit = remember {
+        { label: String -> currentOnFootnoteBackClick.value?.invoke(label) }
     }
 
     CompositionLocalProvider(
         LocalOnLinkClick provides stableOnLinkClick,
+        LocalOnFootnoteClick provides stableOnFootnoteClick,
+        LocalOnFootnoteBackClick provides stableOnFootnoteBackClick,
         LocalRendererDocument provides document,
         LocalImageRenderer provides imageContent,
         LocalMarkdownConfig provides config,
+        LocalFootnoteNavigationState provides footnoteNavigationState,
+        LocalCodeHighlightTheme provides codeTheme,
+        LocalIsStreaming provides isStreaming,
     ) {
         content()
     }

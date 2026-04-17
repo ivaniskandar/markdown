@@ -16,13 +16,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import com.hrm.codehigh.theme.CodeTheme
 import com.hrm.markdown.parser.MarkdownParser
 import com.hrm.markdown.parser.ast.BlankLine
 import com.hrm.markdown.parser.ast.ContainerNode
@@ -30,8 +34,10 @@ import com.hrm.markdown.parser.ast.Document
 import com.hrm.markdown.parser.ast.Node
 import com.hrm.markdown.parser.log.HLog
 import com.hrm.markdown.renderer.block.BlockRenderer
+import com.hrm.markdown.renderer.block.blockRenderRevision
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val TAG_RENDER = "MarkdownRender"
@@ -66,7 +72,6 @@ private const val TAG_RENDER = "MarkdownRender"
  * @param theme 可选的自定义主题，默认跟随系统日夜间模式
  * @param config 解析配置，控制 Markdown 方言（Flavour）和解析行为，默认使用 [MarkdownConfig.Default]（ExtendedFlavour 全功能）
  * @param scrollState 滚动状态，外部可控制滚动位置
- * @param retainStateOnChange 当 markdown 变化时是否保留旧内容直到新内容解析完成（避免闪烁）
  * @param enablePagination 是否启用分页加载，适合超长文档（> 500 段落）
  * @param initialBlockCount 分页模式下初始渲染的块数量
  * @param imageContent 自定义图片渲染组件，null 则使用默认占位渲染
@@ -77,10 +82,10 @@ fun Markdown(
     markdown: String,
     modifier: Modifier = Modifier,
     theme: MarkdownTheme = MarkdownTheme.auto(),
+    codeTheme: CodeTheme? = null,
     config: MarkdownConfig = MarkdownConfig.Default,
     scrollState: ScrollState = rememberScrollState(),
     isStreaming: Boolean = false,
-    retainStateOnChange: Boolean = false,
     enablePagination: Boolean = false,
     enableScroll: Boolean = true,
     initialBlockCount: Int = 100,
@@ -99,6 +104,7 @@ fun Markdown(
             document = document,
             modifier = modifier,
             theme = theme,
+            codeTheme = codeTheme,
             config = config,
             scrollState = scrollState,
             isStreaming = isStreaming,
@@ -109,6 +115,50 @@ fun Markdown(
             onLinkClick = onLinkClick,
         )
     }
+}
+
+/**
+ * Markdown 渲染器的顶层 Composable 入口，支持传入自定义 AST，供需要高度定制的场景使用。
+ *
+ * @param document Markdown AST
+ * @param isStreaming 是否处于流式生成中。为 true 时启用增量解析，避免全量重解析导致的闪烁
+ * @param theme 可选的自定义主题，默认跟随系统日夜间模式
+ * @param config 解析配置，控制 Markdown 方言（Flavour）和解析行为，默认使用 [MarkdownConfig.Default]（ExtendedFlavour 全功能）
+ * @param scrollState 滚动状态，外部可控制滚动位置
+ * @param enablePagination 是否启用分页加载，适合超长文档（> 500 段落）
+ * @param initialBlockCount 分页模式下初始渲染的块数量
+ * @param imageContent 自定义图片渲染组件，null 则使用默认占位渲染
+ * @param onLinkClick 链接点击回调
+ */
+@Composable
+fun Markdown(
+    document: Document,
+    modifier: Modifier = Modifier,
+    theme: MarkdownTheme = MarkdownTheme.auto(),
+    codeTheme: CodeTheme? = null,
+    config: MarkdownConfig = MarkdownConfig.Default,
+    scrollState: ScrollState = rememberScrollState(),
+    isStreaming: Boolean = false,
+    enablePagination: Boolean = false,
+    enableScroll: Boolean = true,
+    initialBlockCount: Int = 100,
+    imageContent: MarkdownImageRenderer? = null,
+    onLinkClick: ((String) -> Unit)? = null,
+) {
+    InnerMarkdown(
+        document = document,
+        modifier = modifier,
+        theme = theme,
+        codeTheme = codeTheme,
+        config = config,
+        scrollState = scrollState,
+        isStreaming = isStreaming,
+        enablePagination = enablePagination,
+        enableScroll = enableScroll,
+        initialBlockCount = initialBlockCount,
+        imageContent = imageContent,
+        onLinkClick = onLinkClick,
+    )
 }
 
 /**
@@ -130,51 +180,95 @@ private fun rememberStreamingDocument(
             enableLinting = config.enableLinting,
         )
     }
-    var lastParsedLength by remember { mutableStateOf(0) }
-    var document by remember { mutableStateOf<Document?>(null) }
-    var wasStreaming by remember { mutableStateOf(false) }
-    var lastNonStreamingMarkdown by remember { mutableStateOf("") }
+    var state by remember(parser) { mutableStateOf(StreamingDocumentState<Document>()) }
 
-    // 流式状态变化检测
-    LaunchedEffect(isStreaming) {
-        if (isStreaming && !wasStreaming) {
-            // 进入流式模式，重置状态
-            parser.beginStream()
-            lastParsedLength = 0
-            document = null
-        } else if (!isStreaming && wasStreaming) {
-            // 流式结束，完成解析
-            document = parser.endStream()
-            lastNonStreamingMarkdown = markdown
-        }
-        wasStreaming = isStreaming
-    }
-
-    // 内容变化处理
-    LaunchedEffect(markdown, isStreaming) {
-        if (isStreaming) {
-            // 流式模式：增量追加
-            if (markdown.length > lastParsedLength) {
-                val chunk = markdown.substring(lastParsedLength)
-                if (chunk.isNotEmpty()) {
-                    document = parser.append(chunk)
-                    lastParsedLength = markdown.length
-                }
-            }
-        } else if (markdown != lastNonStreamingMarkdown) {
-            // 非流式模式：内容变化时全量解析
-            if (markdown.isEmpty()) {
-                document = null
-            } else {
+    LaunchedEffect(markdown, isStreaming, parser) {
+        state = updateStreamingDocumentState(
+            markdown = markdown,
+            isStreaming = isStreaming,
+            state = state,
+            beginStream = parser::beginStream,
+            append = parser::append,
+            endStream = parser::endStream,
+            parse = { value ->
                 withContext(Dispatchers.Default) {
-                    document = parser.parse(markdown)
+                    parser.parse(value)
                 }
             }
-            lastNonStreamingMarkdown = markdown
-        }
+        )
     }
 
-    return document
+    return state.document
+}
+
+internal data class StreamingDocumentState<T>(
+    val lastParsedLength: Int = 0,
+    val document: T? = null,
+    val wasStreaming: Boolean = false,
+    val lastNonStreamingMarkdown: String = "",
+)
+
+internal suspend fun <T> updateStreamingDocumentState(
+    markdown: String,
+    isStreaming: Boolean,
+    state: StreamingDocumentState<T>,
+    beginStream: () -> Unit,
+    append: (String) -> T,
+    endStream: () -> T,
+    parse: suspend (String) -> T?,
+): StreamingDocumentState<T> {
+    var nextState = state
+
+    if (isStreaming && !nextState.wasStreaming) {
+        beginStream()
+        nextState = nextState.copy(
+            lastParsedLength = 0,
+            document = null,
+            wasStreaming = true,
+        )
+    }
+
+    if (isStreaming) {
+        if (markdown.length > nextState.lastParsedLength) {
+            val chunk = markdown.substring(nextState.lastParsedLength)
+            if (chunk.isNotEmpty()) {
+                nextState = nextState.copy(
+                    document = append(chunk),
+                    lastParsedLength = markdown.length,
+                )
+            }
+        }
+        return nextState.copy(wasStreaming = true)
+    }
+
+    if (nextState.wasStreaming) {
+        if (markdown.length > nextState.lastParsedLength) {
+            val chunk = markdown.substring(nextState.lastParsedLength)
+            if (chunk.isNotEmpty()) {
+                nextState = nextState.copy(
+                    document = append(chunk),
+                    lastParsedLength = markdown.length,
+                )
+            }
+        }
+        return nextState.copy(
+            document = endStream(),
+            lastParsedLength = markdown.length,
+            wasStreaming = false,
+            lastNonStreamingMarkdown = markdown,
+        )
+    }
+
+    if (markdown == nextState.lastNonStreamingMarkdown) {
+        return nextState.copy(wasStreaming = false)
+    }
+
+    return nextState.copy(
+        document = parse(markdown),
+        lastParsedLength = markdown.length,
+        wasStreaming = false,
+        lastNonStreamingMarkdown = markdown,
+    )
 }
 
 @Composable
@@ -182,6 +276,7 @@ private fun InnerMarkdown(
     document: Document,
     modifier: Modifier = Modifier,
     theme: MarkdownTheme = MarkdownTheme.auto(),
+    codeTheme: CodeTheme? = null,
     config: MarkdownConfig = MarkdownConfig.Default,
     scrollState: ScrollState = rememberScrollState(),
     isStreaming: Boolean = false,
@@ -191,25 +286,22 @@ private fun InnerMarkdown(
     imageContent: MarkdownImageRenderer? = null,
     onLinkClick: ((String) -> Unit)? = null,
 ) {
-    // ═══ 流式节流：200ms 采样一次，减少高频重组 ═══
-    // 流式期间（isStreaming=true）：每 200ms 采样一次最新的 document 进行渲染，
-    // 上游解析不受影响（每个 token 仍然 append），但渲染层降频到 ~5fps。
-    // 流式结束时（isStreaming 变为 false）：立即消费最终的 document。
     val latestDocument by rememberUpdatedState(document)
     var throttledDocument by remember { mutableStateOf(document) }
 
     LaunchedEffect(isStreaming) {
         if (!isStreaming) {
-            // 非流式模式：立即更新到最新 document
             throttledDocument = latestDocument
             return@LaunchedEffect
         }
-        
-        // 流式期间：立即更新一次,然后每 200ms 采样最新的 document
-        throttledDocument = latestDocument
+
         while (true) {
-            delay(100L)
-            throttledDocument = latestDocument
+            withFrameNanos { }
+            delay(16L)
+            val upstream = latestDocument
+            if (upstream !== throttledDocument) {
+                throttledDocument = upstream
+            }
         }
     }
 
@@ -218,22 +310,31 @@ private fun InnerMarkdown(
 
     // 使用结构性比较缓存 blockNodes：
     // 每次 token 到达都产生新的 Document 对象，但大部分 children 的引用没变。
-    // 通过比较 children 列表的引用身份（size + 首尾元素引用 + stableKey 序列），
-    // 只在结构真正变化时才更新 blockNodes 状态，避免不必要的 Column 重组。
-    val blockNodesState = remember { mutableStateOf(emptyList<Node>()) }
+    // 流式期间仅在块结构变化，或同一块的 renderRevision 变化时才刷新状态，
+    // 避免每个 token 都强制推整列 blockNodes。
+    val blockNodesState = remember { mutableStateOf(emptyList<Node>(), neverEqualPolicy()) }
+    val blockNodeRevisionsState = remember { mutableStateOf(emptyList<Long>()) }
     val newChildren = renderDocument.children
     val newFiltered = newChildren.filter { it !is BlankLine }
     val currentList = blockNodesState.value
-    if (!structurallyEqual(currentList, newFiltered)) {
+    val newRevisions = newFiltered.map(::blockRenderRevision)
+    val shouldRefreshBlockNodes = !structurallyEqual(currentList, newFiltered) ||
+            !revisionsEqual(blockNodeRevisionsState.value, newRevisions)
+    if (shouldRefreshBlockNodes) {
         HLog.d(TAG_RENDER) { "blockNodes updated: ${currentList.size} -> ${newFiltered.size}" }
-        blockNodesState.value = newFiltered
+        blockNodesState.value = newFiltered.toList()
+        blockNodeRevisionsState.value = newRevisions
     }
 
+    val blockNodes = blockNodesState.value
+    val paginationStateKey = if (enablePagination && !isStreaming) document else Unit
     // P1: 分页加载支持 - 渐进式渲染超长文档
-    var visibleBlockCount by remember { mutableIntStateOf(initialBlockCount) }
+    var visibleBlockCount by remember(paginationStateKey, initialBlockCount) {
+        mutableIntStateOf(initialVisibleBlockCount(initialBlockCount, blockNodes.size))
+    }
+    val effectiveVisibleBlockCount = visibleBlockCount.coerceAtMost(blockNodes.size)
 
     // 监听滚动位置，接近底部时自动加载更多块
-    val blockNodes = blockNodesState.value
     LaunchedEffect(scrollState, enablePagination, blockNodes.size) {
         if (!enablePagination) return@LaunchedEffect
 
@@ -253,15 +354,44 @@ private fun InnerMarkdown(
     }
 
     // 计算实际渲染的块列表
-    // 注意：直接读取 blockNodesState.value 而非局部变量，确保 derivedStateOf 能追踪状态变化
-    val renderBlocks by remember {
-        derivedStateOf {
-            val nodes = blockNodesState.value
-            if (enablePagination) {
-                nodes.take(visibleBlockCount)
-            } else {
-                nodes
+    // Use a plain expression here to ensure pagination-related inputs are always reflected.
+    val renderBlocks: List<Node> = run {
+        val nodes = blockNodesState.value
+        if (!enablePagination || effectiveVisibleBlockCount >= nodes.size) return@run nodes
+        if (effectiveVisibleBlockCount <= 0) return@run emptyList()
+        nodes.subList(0, effectiveVisibleBlockCount)
+    }
+
+    val footnoteNavigationState = remember { FootnoteNavigationState() }
+    val coroutineScope = rememberCoroutineScope()
+    val currentOnLinkClick = rememberUpdatedState(onLinkClick)
+    val currentBlockCount = rememberUpdatedState(blockNodes.size)
+    val onFootnoteClick = remember(footnoteNavigationState, enablePagination) {
+        { label: String ->
+            coroutineScope.launch {
+                footnoteNavigationState.rememberReturnPosition(label, scrollState.value)
+
+                if (enablePagination && !footnoteNavigationState.hasDefinition(label)) {
+                    visibleBlockCount = currentBlockCount.value
+                    withFrameNanos { }
+                }
+
+                if (!footnoteNavigationState.bringDefinitionIntoView(label)) {
+                    currentOnLinkClick.value?.invoke("#fn-$label")
+                }
             }
+            Unit
+        }
+    }
+    val onFootnoteBackClick = remember(footnoteNavigationState) {
+        { label: String ->
+            coroutineScope.launch {
+                val returnPosition = footnoteNavigationState.getReturnPosition(label)
+                if (returnPosition != null && enableScroll) {
+                    scrollState.animateScrollTo(returnPosition)
+                }
+            }
+            Unit
         }
     }
 
@@ -269,8 +399,13 @@ private fun InnerMarkdown(
         ProvideRendererContext(
             document = renderDocument,
             onLinkClick = onLinkClick,
+            onFootnoteClick = onFootnoteClick,
+            onFootnoteBackClick = onFootnoteBackClick,
+            footnoteNavigationState = footnoteNavigationState,
             imageContent = imageContent,
             config = config,
+            codeTheme = codeTheme,
+            isStreaming = isStreaming,
         ) {
             // 流式生成期间跳过 SelectionContainer：
             // SelectionContainer 在内容高频变化时会对内部布局做额外的 intrinsic 测量
@@ -284,8 +419,11 @@ private fun InnerMarkdown(
                     verticalArrangement = Arrangement.spacedBy(theme.blockSpacing),
                 ) {
                     for (node in renderBlocks) {
-                        key(node.stableKey) {
-                            BlockRenderer(node)
+                        key(node::class, node.stableKey) {
+                            BlockRenderer(
+                                node = node,
+                                renderRevision = blockRenderRevision(node),
+                            )
                         }
                     }
                 }
@@ -321,8 +459,11 @@ internal fun MarkdownBlockChildren(
         verticalArrangement = Arrangement.spacedBy(theme.blockSpacing),
     ) {
         for (node in blockNodes) {
-            key(node.stableKey) {
-                BlockRenderer(node)
+            key(node::class, node.stableKey) {
+                BlockRenderer(
+                    node = node,
+                    renderRevision = blockRenderRevision(node),
+                )
             }
         }
     }
@@ -342,4 +483,16 @@ private fun structurallyEqual(a: List<Node>, b: List<Node>): Boolean {
         if (a[i] !== b[i]) return false
     }
     return true
+}
+
+private fun revisionsEqual(a: List<Long>, b: List<Long>): Boolean {
+    if (a.size != b.size) return false
+    for (i in a.indices) {
+        if (a[i] != b[i]) return false
+    }
+    return true
+}
+
+private fun initialVisibleBlockCount(initialBlockCount: Int, totalBlockCount: Int): Int {
+    return initialBlockCount.coerceAtLeast(0).coerceAtMost(totalBlockCount.coerceAtLeast(0))
 }

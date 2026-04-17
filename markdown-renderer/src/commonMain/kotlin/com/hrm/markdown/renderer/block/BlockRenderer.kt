@@ -6,12 +6,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.hrm.markdown.parser.ast.*
 import com.hrm.markdown.renderer.LocalMarkdownTheme
 import com.hrm.markdown.renderer.LocalRendererDocument
+
+private fun List<IntRange>.flattenLineNumbers(): Set<Int> = buildSet {
+    for (range in this@flattenLineNumbers) {
+        addAll(range)
+    }
+}
 
 /**
  * 块级节点分发器。
@@ -20,6 +27,7 @@ import com.hrm.markdown.renderer.LocalRendererDocument
 @Composable
 internal fun BlockRenderer(
     node: Node,
+    renderRevision: Long = 0L,
     modifier: Modifier = Modifier,
 ) {
     when (node) {
@@ -27,8 +35,23 @@ internal fun BlockRenderer(
         is SetextHeading -> SetextHeadingRenderer(node, modifier)
         is Paragraph -> ParagraphRenderer(node, modifier)
         is ThematicBreak -> ThematicBreakRenderer(modifier)
-        is FencedCodeBlock -> FencedCodeBlockRenderer(node, modifier)
-        is IndentedCodeBlock -> IndentedCodeBlockRenderer(node, modifier)
+        is FencedCodeBlock -> key(renderRevision) {
+            FencedCodeBlockRenderer(
+                text = node.literal,
+                language = node.language,
+                title = node.attributes.pairs["title"],
+                showLineNumbers = node.showLineNumbers,
+                startLine = node.startLineNumber,
+                highlightedLines = node.highlightLines.flattenLineNumbers(),
+                modifier = modifier,
+            )
+        }
+        is IndentedCodeBlock -> key(renderRevision) {
+            IndentedCodeBlockRenderer(
+                text = node.literal,
+                modifier = modifier,
+            )
+        }
         is BlockQuote -> BlockQuoteRenderer(node, modifier)
         is ListBlock -> ListBlockRenderer(node, modifier)
         is HtmlBlock -> HtmlBlockRenderer(node, modifier)
@@ -60,6 +83,66 @@ internal fun BlockRenderer(
         }
     }
 }
+
+internal fun blockRenderRevision(node: Node): Long = when (node) {
+    is Paragraph -> revisionHash(
+        node.lineRange.endLine.toLong(),
+        node.contentHash,
+        (node.rawContent?.length ?: 0).toLong(),
+    )
+    is Heading -> revisionHash(
+        node.level.toLong(),
+        node.lineRange.endLine.toLong(),
+        node.contentHash,
+        (node.rawContent?.length ?: 0).toLong(),
+    )
+    is SetextHeading -> revisionHash(
+        node.level.toLong(),
+        node.lineRange.endLine.toLong(),
+        node.contentHash,
+        (node.rawContent?.length ?: 0).toLong(),
+    )
+    is FencedCodeBlock -> revisionHash(
+        node.lineRange.endLine.toLong(),
+        node.contentHash,
+        node.literal.length.toLong(),
+    )
+    is IndentedCodeBlock -> revisionHash(
+        node.lineRange.endLine.toLong(),
+        node.contentHash,
+        node.literal.length.toLong(),
+    )
+    is BlockQuote -> revisionHash(
+        node.lineRange.endLine.toLong(),
+        node.contentHash,
+        node.childCount().toLong(),
+    )
+    is ListBlock -> revisionHash(
+        node.lineRange.endLine.toLong(),
+        node.contentHash,
+        node.childCount().toLong(),
+    )
+    is Table -> revisionHash(
+        node.lineRange.endLine.toLong(),
+        node.contentHash,
+        node.childCount().toLong(),
+    )
+    else -> revisionHash(node.lineRange.endLine.toLong(), node.contentHash)
+}
+
+private fun revisionHash(a: Long, b: Long): Long =
+    mixRevision(mixRevision(REVISION_OFFSET_BASIS, a), b)
+
+private fun revisionHash(a: Long, b: Long, c: Long): Long =
+    mixRevision(revisionHash(a, b), c)
+
+private fun revisionHash(a: Long, b: Long, c: Long, d: Long): Long =
+    mixRevision(revisionHash(a, b, c), d)
+
+private fun mixRevision(acc: Long, value: Long): Long = (acc xor value) * REVISION_FNV_PRIME
+
+private const val REVISION_OFFSET_BASIS = -3750763034362895579L
+private const val REVISION_FNV_PRIME = 1099511628211L
 
 /**
  * TOC 占位符渲染器：渲染自动生成的目录。

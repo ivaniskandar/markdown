@@ -3,7 +3,6 @@ package com.hrm.markdown.renderer.block
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -17,6 +16,7 @@ import com.hrm.markdown.renderer.LocalMarkdownConfig
 import com.hrm.markdown.renderer.LocalMarkdownTheme
 import com.hrm.markdown.renderer.LocalOnLinkClick
 import com.hrm.markdown.renderer.LocalRendererDocument
+import com.hrm.markdown.renderer.inline.InlineFlowText
 import com.hrm.markdown.renderer.inline.rememberInlineContent
 
 /**
@@ -32,27 +32,30 @@ internal fun HeadingRenderer(
     val config = LocalMarkdownConfig.current
     val level = (node.level - 1).coerceIn(0, theme.headingStyles.lastIndex)
     val style = theme.headingStyles[level]
-    val (annotated, inlineContents) = rememberInlineContent(node, onLinkClick)
-
+    val inlineResult = rememberInlineContent(
+        parent = node,
+        onLinkClick = onLinkClick,
+        hostTextStyle = style,
+    )
     val numbering = if (config.enableHeadingNumbering) {
         val document = LocalRendererDocument.current
         remember(document, node) { computeHeadingNumber(document.children, node) }
     } else null
 
     val finalAnnotated = if (numbering != null) {
-        remember(numbering, annotated) {
+        remember(numbering, inlineResult.annotated) {
             buildAnnotatedString {
                 append("$numbering ")
-                append(annotated)
+                append(inlineResult.annotated)
             }
         }
-    } else annotated
+    } else inlineResult.annotated
 
     Column(modifier = modifier.fillMaxWidth()) {
-        BasicText(
-            text = finalAnnotated,
+        InlineFlowText(
+            annotated = finalAnnotated,
+            inlineContents = inlineResult.inlineContents,
             style = style,
-            inlineContent = inlineContents,
         )
 
         // h1 和 h2 下方添加分隔线（GitHub 风格）
@@ -79,27 +82,30 @@ internal fun SetextHeadingRenderer(
     val config = LocalMarkdownConfig.current
     val level = (node.level - 1).coerceIn(0, theme.headingStyles.lastIndex)
     val style = theme.headingStyles[level]
-    val (annotated, inlineContents) = rememberInlineContent(node, onLinkClick)
-
+    val inlineResult = rememberInlineContent(
+        parent = node,
+        onLinkClick = onLinkClick,
+        hostTextStyle = style,
+    )
     val numbering = if (config.enableHeadingNumbering) {
         val document = LocalRendererDocument.current
         remember(document, node) { computeHeadingNumberForSetext(document.children, node) }
     } else null
 
     val finalAnnotated = if (numbering != null) {
-        remember(numbering, annotated) {
+        remember(numbering, inlineResult.annotated) {
             buildAnnotatedString {
                 append("$numbering ")
-                append(annotated)
+                append(inlineResult.annotated)
             }
         }
-    } else annotated
+    } else inlineResult.annotated
 
     Column(modifier = modifier.fillMaxWidth()) {
-        BasicText(
-            text = finalAnnotated,
+        InlineFlowText(
+            annotated = finalAnnotated,
+            inlineContents = inlineResult.inlineContents,
             style = style,
-            inlineContent = inlineContents,
         )
 
         HorizontalDivider(
