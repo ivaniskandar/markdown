@@ -3,11 +3,6 @@ plugins {
     application
 }
 
-repositories {
-    mavenCentral()
-    google()
-}
-
 dependencies {
     implementation(project(":markdown-renderer"))
 }

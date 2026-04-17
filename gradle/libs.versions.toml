@@ -19,7 +19,7 @@ ktor = "3.4.1"
 material3 = "1.10.0-alpha05"
 lifecycleRuntimeKtx = "2.10.0"
 composeBom = "2026.02.01"
-latex = '0.1.0'
+latex = '1f99fc0'
 codehigh = '1.0.6'
 
 [libraries]
